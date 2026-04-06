@@ -1,0 +1,46 @@
+:root {
+    --bg-deep: #0f172a;      
+    --bg-card: #1e293b;      
+    --accent: #3b82f6;       /* Azul */
+    --success: #10b981;      /* Verde */
+    --text-white: #f1f5f9;
+    --border: #334155;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+body { background-color: var(--bg-deep); color: var(--text-white); overflow-x: hidden; }
+
+/* LOGOS */
+.logo-login { width: 140px; margin-bottom: 20px; filter: brightness(1.2) drop-shadow(0 0 5px rgba(255,255,255,0.2)); }
+.logo-header { height: 30px; filter: brightness(1.2); }
+
+/* LOGIN */
+#tela-login { height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+.login-box { background: var(--bg-card); padding: 40px; border-radius: 20px; width: 100%; max-width: 380px; text-align: center; border: 1px solid var(--border); }
+.input-wrapper { position: relative; margin-bottom: 15px; }
+.input-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--accent); }
+.input-wrapper input { width: 100%; padding: 12px 12px 12px 45px; background: #020617; border: 1px solid var(--border); border-radius: 10px; color: white; outline: none; }
+
+/* BOTÕES */
+.btn-primary { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: 700; cursor: pointer; }
+.btn-add-lista { background: #2563eb !important; margin-top: 15px; } /* Azul Forte */
+.btn-finish-dia { background: var(--success) !important; margin-top: 15px; } /* Verde */
+.btn-voltar-clean { background: #475569; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+.btn-logout { background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 5px; margin-left: 10px; cursor: pointer; }
+
+/* LAYOUT */
+header { padding: 15px 20px; background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+.grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 20px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 15px; padding: 25px 10px; text-align: center; cursor: pointer; }
+.card i { font-size: 24px; color: var(--accent); margin-bottom: 10px; display: block; }
+.card span { font-size: 13px; font-weight: 600; text-transform: uppercase; }
+
+.modulo-header { display: flex; align-items: center; gap: 15px; padding: 15px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.grid-quimicos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.grid-quimicos input { background: #020617; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 8px; text-align: center; }
+
+/* HISTÓRICO */
+.folder-year { background: var(--accent); padding: 10px; margin-top: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+.folder-month { background: #334155; padding: 8px; margin: 5px 0 5px 20px; border-radius: 5px; cursor: pointer; }
+.history-day-card { background: #0f172a; padding: 12px; margin: 5px 0 5px 40px; border-radius: 8px; border-left: 3px solid var(--accent); }
