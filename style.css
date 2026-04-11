@@ -5,11 +5,55 @@
     --success: #10b981;      /* Verde */
     --text-white: #f1f5f9;
     --border: #334155;
+    --input-bg: #020617;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+    font-family: 'Inter', sans-serif; 
+}
 
-body { background-color: var(--bg-deep); color: var(--text-white); overflow-x: hidden; }
+body { 
+    background-color: var(--bg-deep); 
+    color: var(--text-white); 
+    overflow-x: hidden; 
+}
+
+/* --- ESTILOS DE FORMULÁRIO (CORREÇÃO MOBILE) --- */
+
+/* Esta regra força o fundo escuro e remove o estilo branco do celular */
+input, select, textarea {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--input-bg) !important;
+    color: white !important;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    outline: none;
+    font-size: 16px; /* Evita zoom automático no iOS ao clicar */
+    
+    /* Remove visual padrão do sistema (iOS/Android) */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* Adiciona uma setinha personalizada nos selects já que removemos a padrão */
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+/* Faz o calendário do input date ficar dark */
+input[type="date"] {
+    color-scheme: dark;
+}
 
 /* LOGOS */
 .logo-login { width: 140px; margin-bottom: 20px; filter: brightness(1.2) drop-shadow(0 0 5px rgba(255,255,255,0.2)); }
@@ -19,13 +63,13 @@ body { background-color: var(--bg-deep); color: var(--text-white); overflow-x: h
 #tela-login { height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
 .login-box { background: var(--bg-card); padding: 40px; border-radius: 20px; width: 100%; max-width: 380px; text-align: center; border: 1px solid var(--border); }
 .input-wrapper { position: relative; margin-bottom: 15px; }
-.input-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--accent); }
-.input-wrapper input { width: 100%; padding: 12px 12px 12px 45px; background: #020617; border: 1px solid var(--border); border-radius: 10px; color: white; outline: none; }
+.input-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--accent); z-index: 1; }
+.input-wrapper input { padding-left: 45px; }
 
 /* BOTÕES */
 .btn-primary { background: var(--accent); color: white; border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: 700; cursor: pointer; }
-.btn-add-lista { background: #2563eb !important; margin-top: 15px; } /* Azul Forte */
-.btn-finish-dia { background: var(--success) !important; margin-top: 15px; } /* Verde */
+.btn-add-lista { background: #2563eb !important; margin-top: 15px; }
+.btn-finish-dia { background: var(--success) !important; margin-top: 15px; }
 .btn-voltar-clean { background: #475569; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 .btn-logout { background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 5px; margin-left: 10px; cursor: pointer; }
 
@@ -38,67 +82,35 @@ header { padding: 15px 20px; background: var(--bg-card); display: flex; justify-
 
 .modulo-header { display: flex; align-items: center; gap: 15px; padding: 15px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
 .grid-quimicos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.grid-quimicos input { background: #020617; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 8px; text-align: center; }
+.grid-quimicos input { text-align: center; margin-bottom: 0; }
 
 /* HISTÓRICO */
 .folder-year { background: var(--accent); padding: 10px; margin-top: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 .folder-month { background: #334155; padding: 8px; margin: 5px 0 5px 20px; border-radius: 5px; cursor: pointer; }
 .history-day-card { background: #0f172a; padding: 12px; margin: 5px 0 5px 40px; border-radius: 8px; border-left: 3px solid var(--accent); }
+
 /* --- AJUSTES DE RESPONSIVIDADE --- */
 
-/* Ajuste Global para Containers */
-.container {
-    width: 100%;
-    max-width: 1200px; /* Impede que o site fique largo demais em monitores gigantes */
-    margin: 0 auto;
-}
+.container { width: 100%; max-width: 1200px; margin: 0 auto; }
 
 /* 📱 CELULARES (Até 600px) */
 @media (max-width: 600px) {
-    .grid-container {
-        grid-template-columns: 1fr; /* Um card por linha no celular */
-        padding: 15px;
-    }
-
-    .grid-quimicos {
-        grid-template-columns: 1fr; /* Inputs um abaixo do outro */
-    }
-
-    .login-box {
-        padding: 25px;
-        max-width: 90%; /* Box de login ocupa quase toda a largura */
-    }
-
-    .card {
-        padding: 20px 10px;
-    }
+    .grid-container { grid-template-columns: 1fr; padding: 15px; }
+    .grid-quimicos { grid-template-columns: 1fr; }
+    .login-box { padding: 25px; max-width: 90%; }
+    .card { padding: 20px 10px; }
 }
 
 /* tablets (De 601px até 1024px) */
 @media (min-width: 601px) and (max-width: 1024px) {
-    .grid-container {
-        grid-template-columns: 1fr 1fr; /* Dois cards por linha (como você já tinha) */
-    }
-    
-    .grid-quimicos {
-        grid-template-columns: 1fr 1fr;
-    }
+    .grid-container { grid-template-columns: 1fr 1fr; }
+    .grid-quimicos { grid-template-columns: 1fr 1fr; }
 }
 
 /* 💻 COMPUTADORES (Acima de 1025px) */
 @media (min-width: 1025px) {
-    .grid-container {
-        grid-template-columns: 1fr 1fr 1fr 1fr; /* Quatro cards por linha no PC para aproveitar o espaço */
-        gap: 20px;
-    }
-
-    header {
-        padding: 15px 10%; /* Mais respiro nas laterais em telas grandes */
-    }
+    .grid-container { grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; }
+    header { padding: 15px 10%; }
 }
 
-/* Ajuste extra para imagens e logos não quebrarem */
-img {
-    max-width: 100%;
-    height: auto;
-}
+img { max-width: 100%; height: auto; }
