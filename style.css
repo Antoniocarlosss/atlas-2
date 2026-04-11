@@ -44,3 +44,61 @@ header { padding: 15px 20px; background: var(--bg-card); display: flex; justify-
 .folder-year { background: var(--accent); padding: 10px; margin-top: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 .folder-month { background: #334155; padding: 8px; margin: 5px 0 5px 20px; border-radius: 5px; cursor: pointer; }
 .history-day-card { background: #0f172a; padding: 12px; margin: 5px 0 5px 40px; border-radius: 8px; border-left: 3px solid var(--accent); }
+/* --- AJUSTES DE RESPONSIVIDADE --- */
+
+/* Ajuste Global para Containers */
+.container {
+    width: 100%;
+    max-width: 1200px; /* Impede que o site fique largo demais em monitores gigantes */
+    margin: 0 auto;
+}
+
+/* 📱 CELULARES (Até 600px) */
+@media (max-width: 600px) {
+    .grid-container {
+        grid-template-columns: 1fr; /* Um card por linha no celular */
+        padding: 15px;
+    }
+
+    .grid-quimicos {
+        grid-template-columns: 1fr; /* Inputs um abaixo do outro */
+    }
+
+    .login-box {
+        padding: 25px;
+        max-width: 90%; /* Box de login ocupa quase toda a largura */
+    }
+
+    .card {
+        padding: 20px 10px;
+    }
+}
+
+/* tablets (De 601px até 1024px) */
+@media (min-width: 601px) and (max-width: 1024px) {
+    .grid-container {
+        grid-template-columns: 1fr 1fr; /* Dois cards por linha (como você já tinha) */
+    }
+    
+    .grid-quimicos {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* 💻 COMPUTADORES (Acima de 1025px) */
+@media (min-width: 1025px) {
+    .grid-container {
+        grid-template-columns: 1fr 1fr 1fr 1fr; /* Quatro cards por linha no PC para aproveitar o espaço */
+        gap: 20px;
+    }
+
+    header {
+        padding: 15px 10%; /* Mais respiro nas laterais em telas grandes */
+    }
+}
+
+/* Ajuste extra para imagens e logos não quebrarem */
+img {
+    max-width: 100%;
+    height: auto;
+}
