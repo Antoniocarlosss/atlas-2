@@ -271,17 +271,25 @@ container.innerHTML = `
                 <label style="color:#94a3b8; font-size:10px;">PEN</label>
                 <input type="number" id="edit-pen" value="${item.pen || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white;">
             </div>
+            <div>
+                <label style="color:#94a3b8; font-size:10px;">Cat 1</label>
+                <input type="number" id="edit-cat1" value="${item.cat1 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white;">
+            </div>
+            <div>
+                <label style="color:#94a3b8; font-size:10px;">Cat 2</label>
+                <input type="number" id="edit-cat2" value="${item.cat2 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white;">
+            </div>
+            <div>
+                <label style="color:#94a3b8; font-size:10px;">Cat 3</label>
+                <input type="number" id="edit-cat3" value="${item.cat3 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white;">
+            </div>
+            <div>
+                <label style="color:#94a3b8; font-size:10px;">Cat 4</label>
+                <input type="number" id="edit-cat4" value="${item.cat4 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white;">
+            </div>
         </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:5px;">
-            <input type="number" id="edit-cat1" placeholder="CAT 1" value="${item.cat1 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white; font-size:11px;">
-            <input type="number" id="edit-cat2" placeholder="CAT 2" value="${item.cat2 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white; font-size:11px;">
-            <input type="number" id="edit-cat3" placeholder="CAT 3" value="${item.cat3 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white; font-size:11px;">
-            <input type="number" id="edit-cat4" placeholder="CAT 4" value="${item.cat4 || 0}" style="width:100%; padding:6px; border-radius:5px; border:1px solid #334155; background:#020617; color:white; font-size:11px;">
-        </div>
+`;
         
-        <p style="color:#475569; font-size:9px; text-align:right; margin:0;">ID Registro: ${item.id}</p>
-    </div>
 `;
 
 // Chamar a função para carregar as paragens LOGO APÓS preencher o innerHTML
