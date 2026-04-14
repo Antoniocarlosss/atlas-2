@@ -78,9 +78,13 @@ function exibirFormulario(modulo) {
                 <div style="flex:1;">
                     <label style="font-size:12px; color:#94a3b8;">ESPESSURA</label>
                     <select id="inj-esp">
-                        <option value="20">20 mm</option><option value="30">30 mm</option>
-                        <option value="40">40 mm</option><option value="50">50 mm</option>
-                        <option value="60">60 mm</option><option value="80">80 mm</option>
+                        <option value="30">30 mm</option>
+                        <option value="40">40 mm</option>
+                        <option value="50">50 mm</option>
+                        <option value="60">60 mm</option>
+                        <option value="80">80 mm</option>
+                        <option value="100">100 mm</option>
+                         <option value="120">120 mm</option>
                     </select>
                 </div>
                 <div style="flex:1;">
@@ -100,7 +104,13 @@ function exibirFormulario(modulo) {
                 <input type="number" id="q-cat4" placeholder="Cat 4 kg">
                 <select id="q-vel">
                     <option value="" disabled selected>Vel (m/min)</option>
-                    <option value="5">5 m/min</option><option value="12">12 m/min</option>
+                    <option value="5 m/min">5 m/min</option>
+                    <option value="6 m/min">6 m/min</option>
+                    <option value="8 m/min">8 m/min</option>
+                    <option value="9 m/min">9 m/min</option>
+                    <option value="10 m/min">10 m/min</option>
+                    <option value="11 m/min">11 m/min</option>
+                    <option value="12 m/min">12 m/min</option>
                 </select>
             </div>
 
