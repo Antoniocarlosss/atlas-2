@@ -469,7 +469,7 @@ function gerarPDF_Injecao_Final(dadosEncoded) {
     </table>
 
     <div style="margin-top: 30px; font-size: 10px; color: #666; text-align: center; border-top: 1px solid #ddd; padding-top: 10px;">
-     <h2>Assinatura Responsável________________________________________________</h2>
+        Este documento foi gerado eletronicamente pelo Sistema Atlas.
     </div>
 `;
 
