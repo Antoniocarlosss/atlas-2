@@ -400,29 +400,34 @@ function gerarPDF_Injecao_Final(dadosEncoded) {
     const rel = JSON.parse(decodeURIComponent(dadosEncoded));
     const janela = window.open('', '_blank');
 
-    // Montagem das linhas da tabela (Lógica do seu projeto de Injeção)
     let tabelaItens = "";
+    let totalMetrosDia = 0; // 1. Variável para acumular o total
+
     rel.itens.forEach(item => {
+        // 2. Somar os metros ao total (convertendo para número para evitar erros)
+        const metrosNum = parseFloat(item.metros) || 0;
+        totalMetrosDia += metrosNum;
+
         tabelaItens += `
             <tr>
-                <td style="border: 1px solid #000; padding: 6px; font-size: 11px;">${item.nome}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.esp}mm</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px; font-weight:bold;">${item.metros} m</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.vel}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.pol}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.mdi}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.pen}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.cat1}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.cat2}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.cat3}</td>
-                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 11px;">${item.cat4}</td>
+                <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">${item.nome}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.esp}mm</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px; font-weight:bold;">${metrosNum.toFixed(2)} m</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.vel}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.pol}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.mdi}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.pen}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.cat1}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.cat2}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.cat3}</td>
+                <td style="border: 1px solid #000; padding: 6px; text-align:center; font-size: 10px;">${item.cat4}</td>
             </tr>`;
         
         if(item.paragens && item.paragens.length > 0) {
             let pTexto = item.paragens.map(p => `• ${p.motivo} (${p.tempo}min)`).join("  |  ");
             tabelaItens += `
                 <tr>
-                    <td colspan="11" style="border: 1px solid #000; padding: 6px; font-size: 10px; background: #f2f2f2;">
+                    <td colspan="11" style="border: 1px solid #000; padding: 6px; font-size: 9px; background: #f2f2f2;">
                         <b>PARAGENS:</b> ${pTexto}
                     </td>
                 </tr>`;
@@ -432,82 +437,82 @@ function gerarPDF_Injecao_Final(dadosEncoded) {
     janela.document.write(`
         <html>
         <head>
-            <title>Relatório de Injeção - ${rel.data}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-                body { padding: 20px; font-family: Arial, sans-serif; color: #000; }
-                .header-table { width: 100%; border-bottom: 3px solid #000; margin-bottom: 20px; padding-bottom: 10px; }
-                
-                /* LOGO EM CSS PARA NÃO FALHAR */
-                .logo-box { 
-                    background: #090909; 
-                    color: #fff; 
-                    padding: 10px; 
-                    display: inline-block; 
-                    border-radius: 4px; 
-                    text-align: center;
-                    font-family: 'Arial Black', sans-serif;
-                }
-                
+                * { box-sizing: border-box; }
+                body { padding: 10px; font-family: Arial, sans-serif; color: #000; margin: 0; }
+                .header-table { width: 100%; background: #000; color: #fff; padding: 15px; border-bottom: 5px solid #E31C24; margin-bottom: 15px; }
+                .logo-wrapper { display: flex; align-items: center; }
+                .logo-icon { display: flex; flex-direction: column; gap: 4px; margin-right: 12px; }
+                .logo-bar { width: 35px; height: 10px; background: #E31C24; }
+                .text-atlas { font-family: 'Arial Black', sans-serif; font-size: 28px; line-height: 1; color: #fff; font-weight: 900; }
+                .text-painel { font-family: sans-serif; font-size: 10px; letter-spacing: 5px; color: #fff; text-transform: uppercase; }
                 .titulo-relatorio { text-align: right; }
-                .titulo-relatorio h1 { margin: 0; font-size: 22px; }
-                
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th { background: #e2e8f0; border: 1px solid #000; padding: 8px; font-size: 11px; }
-                
+                .table-container { width: 100%; overflow-x: auto; } 
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 650px; } 
+                th { background: #e2e8f0; border: 1px solid #000; padding: 5px; font-size: 10px; }
+                td { border: 1px solid #000; padding: 5px; font-size: 10px; }
+
+                /* 3. ESTILO DA CAIXA DE TOTAL */
+                .total-box { 
+                    margin-top: 20px; 
+                    padding: 15px; 
+                    background: #f8f9fa; 
+                    border: 2px solid #000; 
+                    text-align: center; 
+                    font-size: 16px; 
+                    font-weight: bold;
+                }
+
                 @media print { 
-                    .no-print { display: none; } 
-                    body { padding: 0; }
+                    .no-print { display: none !important; } 
+                    .header-table { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; }
+                    .logo-bar { background: #E31C24 !important; -webkit-print-color-adjust: exact; }
+                    @page { size: landscape; } 
                 }
             </style>
         </head>
         <body>
             <table class="header-table">
                 <tr>
-                    <td width="40%">
-                        <div class="logo-box">
-                            <span style="font-size: 20px; letter-spacing: 1px;">ATLAS</span><br>
-                            <span style="font-size: 20px; border-top: 1px solid #fff;">PAINEL</span>
+                    <td>
+                        <div class="logo-wrapper">
+                            <div class="logo-icon"><div class="logo-bar"></div><div class="logo-bar"></div></div>
+                            <div class="logo-text-box"><span class="text-atlas">ATLAS</span><br><span class="text-painel">P A I N E L</span></div>
                         </div>
                     </td>
                     <td class="titulo-relatorio">
                         <h1>RELATÓRIO DE INJEÇÃO</h1>
-                        <p style="margin:5px 0;">Data: <strong>${rel.data}</strong></p>
-                        <p style="margin:0;">Operador: <strong>${rel.operador}</strong></p>
+                        <p>Data: <strong>${rel.data}</strong> | Operador: <strong>${rel.operador}</strong></p>
                     </td>
                 </tr>
             </table>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>PRODUTO</th>
-                        <th>ESP.</th>
-                        <th>METROS</th>
-                        <th>VEL.</th>
-                        <th>POL</th>
-                        <th>MDI</th>
-                        <th>PEN</th>
-                        <th>C1</th>
-                        <th>C2</th>
-                        <th>C3</th>
-                        <th>C4</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${tabelaItens}
-                </tbody>
-            </table>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>PRODUTO</th><th>ESP.</th><th>METROS</th><th>VEL.</th><th>POL</th><th>MDI</th><th>PEN</th><th>C1</th><th>C2</th><th>C3</th><th>C4</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tabelaItens}
+                    </tbody>
+                </table>
+            </div>
 
-            <div style="margin-top: 50px; text-align: center; no-print">
-                <button onclick="window.print()" class="no-print" style="padding: 12px 25px; background: #000; color: #fff; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; font-size: 16px;">
+            <div class="total-box">
+                TOTAL PRODUZIDO NO DIA: <span style="color: #E31C24; font-size: 20px;">${totalMetrosDia.toFixed(2)} metros</span>
+            </div>
+
+            <div class="btn-container no-print" style="text-align:center; margin-top:20px;">
+                <button onclick="window.print()" style="padding: 15px 30px; background: #000; color: #fff; border: 3px solid #E31C24; cursor: pointer; border-radius: 8px; font-weight: bold; width: 90%;">
                     🖨️ IMPRIMIR / SALVAR PDF
                 </button>
-                <p class="no-print" style="font-size: 12px; color: #0a0808; margin-top: 10px;">(Ao clicar, selecione "Salvar como PDF" na impressora)</p>
             </div>
         </body>
         </html>
     `);
-
     janela.document.close();
 }
-//fim da parte da injeççao
+//fim da seccao injeççao
