@@ -35,16 +35,24 @@ function abrirModulo(nome) {
         gestao: "GESTÃO", 
         config: "AJUSTES" 
     };
+    
     document.getElementById('titulo-modulo').innerText = titulos[nome];
     const render = document.getElementById('render-modulo');
 
+    // MÓDULO INJEÇÃO (Mantido como você já tem)
     if (nome === 'injecao') {
         render.innerHTML = `
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; padding:15px;">
                 <div class="card" onclick="exibirFormulario('injecao')"><i class="fas fa-plus"></i><span>Novo Relatório</span></div>
                 <div class="card" onclick="exibirHistoricoModulo('injecao')"><i class="fas fa-history"></i><span>Histórico</span></div>
             </div>`;
-    } else {
+    } 
+    // NOVO MÓDULO BOBINES
+    else if (nome === 'bobines') {
+        renderizarMenuBobines();
+    } 
+    // MÓDULOS EM DESENVOLVIMENTO
+    else {
         render.innerHTML = `
             <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px; color:#94a3b8; text-align:center; padding:20px;">
                 <i class="fas fa-laptop-code" style="font-size:40px; margin-bottom:15px; color:#3b82f6;"></i>
@@ -548,3 +556,52 @@ function gerarPDF_Injecao_Final(dadosEncoded) {
     janela.document.close();
 }
 //final da injeççao
+
+/* ==========================================================================
+   MÓDULO: BOBINES
+   ========================================================================== */
+function renderizarMenuBobines() {
+    const render = document.getElementById('render-modulo');
+    
+    render.innerHTML = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; padding:15px;">
+            <div class="card" onclick="moduloBobine('novo')">
+                <i class="fas fa-file-circle-plus"></i>
+                <span style="font-size:11px;">CRIAR RELATÓRIO</span>
+            </div>
+            <div class="card" onclick="moduloBobine('historico')">
+                <i class="fas fa-clock-rotate-left"></i>
+                <span style="font-size:11px;">HISTÓRICO</span>
+            </div>
+            <div class="card" onclick="moduloBobine('calculadora')">
+                <i class="fas fa-calculator"></i>
+                <span style="font-size:11px;">CALC. BOBINA</span>
+            </div>
+            <div class="card" onclick="moduloBobine('calculadora_agro')">
+                <i class="fas fa-wheat-awn"></i>
+                <span style="font-size:11px;">CALC. AGROPAINEL</span>
+            </div>
+        </div>
+    `;
+}
+
+// Direcionamento das funções de Bobines
+function moduloBobine(tipo) {
+    const render = document.getElementById('render-modulo');
+    
+    switch(tipo) {
+        case 'novo':
+            // Aqui chamaremos a função para criar o relatório (próximo passo)
+            render.innerHTML = `<h2 style="color:white; text-align:center;">Novo Relatório de Bobines</h2>`;
+            break;
+        case 'historico':
+            render.innerHTML = `<h2 style="color:white; text-align:center;">Histórico de Bobines</h2>`;
+            break;
+        case 'calculadora':
+            renderizarCalculadoraBobina(); // Vamos criar essa função a seguir
+            break;
+        case 'calculadora_agro':
+            render.innerHTML = `<h2 style="color:white; text-align:center;">Calculadora Agropainel</h2>`;
+            break;
+    }
+}
