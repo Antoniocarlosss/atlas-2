@@ -512,7 +512,7 @@ function gerarPDF_Injecao_Final(dadosEncoded) {
                         <span class="text-painel">P A I N E L</span>
                     </div>
                 </div>
-                <div style="text-align: right;">
+                <div style="text-align: center;">
                     <h2 style="margin:0; font-size: 16px;">RELATÓRIO DE INJEÇÃO</h2>
                 </div>
             </div>
@@ -600,8 +600,202 @@ function moduloBobine(tipo) {
         case 'calculadora':
             renderizarCalculadoraBobina(); // Vamos criar essa função a seguir
             break;
-        case 'calculadora_agro':
-            render.innerHTML = `<h2 style="color:white; text-align:center;">Calculadora Agropainel</h2>`;
-            break;
+       case 'calculadora_agro':
+    renderizarCalculadoraAgro();
+    break;
     }
 }
+function renderizarCalculadoraBobina() {
+    const render = document.getElementById('render-modulo');
+    
+    // HTML da Calculadora adaptado ao seu tema escuro
+    render.innerHTML = `
+        <div style="padding: 15px; color: white;">
+            <div style="background: #1e293b; padding: 20px; border-radius: 15px; border: 1px solid #334155;">
+                
+                <label style="display:block; margin-bottom:10px; font-weight:bold; color:#94a3b8;">LARGURA DA ABA (cm)</label>
+                <select id="calc_largura" onchange="calcularLogicaBobina()" style="width:100%; padding:15px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:18px; margin-bottom:20px;">
+                    </select>
+
+                <label style="display:block; margin-bottom:10px; font-weight:bold; color:#94a3b8;">ESPESSURA (mm)</label>
+                <div id="calc_espessuras" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:20px;">
+                    </div>
+
+                <label style="display:block; margin-bottom:10px; font-weight:bold; color:#94a3b8;">VELOCIDADE (m/min)</label>
+                <div id="calc_velocidades" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:20px;">
+                    </div>
+
+                <div style="background:#0f172a; padding:15px; border-radius:10px; border-left:5px solid #E31C24;">
+                    <div id="res_metros" style="font-size:18px; margin-bottom:5px;">Metros: <b>0</b></div>
+                    <div id="res_tempo" style="font-size:18px; margin-bottom:5px;">Tempo: <b>0</b></div>
+                    <div id="res_hora" style="font-size:18px; color:#E31C24; font-weight:bold;">Finaliza às: <b>--:--</b></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 1. Popular Larguras (1 a 50cm)
+    const selLargura = document.getElementById("calc_largura");
+    for(let i=1; i<=50; i+=0.5){
+        let o = document.createElement("option");
+        o.value = i;
+        o.text = (i % 1 === 0) ? i + " cm" : i.toFixed(1) + " cm";
+        if(i === 20) o.selected = true; // Valor padrão
+        selLargura.appendChild(o);
+    }
+
+    // 2. Popular Espessuras
+    let espSel = 0.32;
+    const espessuras = [0.28, 0.30, 0.32, 0.35, 0.38, 0.40, 0.43, 0.45, 0.68];
+    const divEsp = document.getElementById("calc_espessuras");
+    
+    espessuras.forEach(e => {
+        let b = document.createElement("button");
+        b.innerText = e;
+        b.style = "padding:12px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; font-weight:bold; cursor:pointer;";
+        if(e === espSel) b.style.borderColor = "#E31C24";
+
+        b.onclick = () => {
+            espSel = e;
+            Array.from(divEsp.children).forEach(btn => btn.style.borderColor = "#334155");
+            b.style.borderColor = "#E31C24";
+            calcularLogicaBobina(parseFloat(selLargura.value), espSel, velSel);
+        };
+        divEsp.appendChild(b);
+    });
+
+    // 3. Popular Velocidades
+    let velSel = 10;
+    const velocidades = [5, 6, 7, 8, 9, 10, 11, 12];
+    const divVel = document.getElementById("calc_velocidades");
+
+    velocidades.forEach(v => {
+        let b = document.createElement("button");
+        b.innerText = v;
+        b.style = "padding:12px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; font-weight:bold; cursor:pointer;";
+        if(v === velSel) b.style.borderColor = "#E31C24";
+
+        b.onclick = () => {
+            velSel = v;
+            Array.from(divVel.children).forEach(btn => btn.style.borderColor = "#334155");
+            b.style.borderColor = "#E31C24";
+            calcularLogicaBobina(parseFloat(selLargura.value), espSel, velSel);
+        };
+        divVel.appendChild(b);
+    });
+
+    // 4. Lógica de Cálculo (Sua fórmula antiga)
+    window.calcularLogicaBobina = function() {
+        const L = parseFloat(document.getElementById("calc_largura").value);
+        const interno = 500;
+        const pi = 3.14;
+        
+        const largura_mm = L * 10;
+        const p1 = largura_mm / espSel;
+        const p2 = p1 * pi;
+        const soma = interno + largura_mm;
+        
+        const metros = Math.round((p2 * soma) / 1000);
+        const tempoTotalMin = Math.round(metros / velSel);
+        
+        const fim = new Date();
+        fim.setMinutes(fim.getMinutes() + tempoTotalMin);
+        
+        const horas = Math.floor(tempoTotalMin / 60);
+        const minutos = tempoTotalMin % 60;
+        let textoTempo = (horas > 0) ? `${horas}h ${minutos}min` : `${minutos} min`;
+
+        document.getElementById("res_metros").innerHTML = `Metros: <b>${metros} m</b>`;
+        document.getElementById("res_tempo").innerHTML = `Tempo: <b>${textoTempo}</b>`;
+        document.getElementById("res_hora").innerHTML = `Finaliza às: <b>${fim.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</b>`;
+    };
+
+    // Rodar cálculo inicial
+    calcularLogicaBobina();
+}
+function renderizarCalculadoraAgro() {
+    const render = document.getElementById('render-modulo');
+    
+    render.innerHTML = `
+        <div style="padding: 15px; color: white;">
+            <div style="background: #1e293b; padding: 20px; border-radius: 15px; border: 1px solid #334155;">
+                <h3 style="color:#E31C24; margin-top:0; text-align:center;">CALCULADORA AGROPAINEL</h3>
+                <p style="text-align:center; font-size:12px; color:#94a3b8;">Espessura Fixa: 0.60mm | Interno: 200</p>
+
+                <label style="display:block; margin-bottom:10px; font-weight:bold; color:#94a3b8;">LARGURA DA ABA (cm)</label>
+                <select id="agro_largura" onchange="calcularLogicaAgro()" style="width:100%; padding:15px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:18px; margin-bottom:20px;">
+                </select>
+
+                <label style="display:block; margin-bottom:10px; font-weight:bold; color:#94a3b8;">VELOCIDADE (m/min)</label>
+                <div id="agro_velocidades" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:20px;">
+                </div>
+
+                <div style="background:#0f172a; padding:15px; border-radius:10px; border-left:5px solid #E31C24;">
+                    <div id="agro_res_metros" style="font-size:18px; margin-bottom:5px;">Metros: <b>0</b></div>
+                    <div id="agro_res_tempo" style="font-size:18px; margin-bottom:5px;">Tempo: <b>0</b></div>
+                    <div id="agro_res_hora" style="font-size:18px; color:#E31C24; font-weight:bold;">Finaliza às: <b>--:--</b></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 1. Popular Larguras (1 a 50cm)
+    const selLargura = document.getElementById("agro_largura");
+    for(let i=1; i<=50; i+=0.5){
+        let o = document.createElement("option");
+        o.value = i;
+        o.text = (i % 1 === 0) ? i + " cm" : i.toFixed(1) + " cm";
+        if(i === 15) o.selected = true; 
+        selLargura.appendChild(o);
+    }
+
+    // 2. Popular Velocidades
+    let velSelAgro = 10;
+    const velocidades = [5, 6, 7, 8, 9, 10, 11, 12];
+    const divVel = document.getElementById("agro_velocidades");
+
+    velocidades.forEach(v => {
+        let b = document.createElement("button");
+        b.innerText = v;
+        b.style = "padding:12px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; font-weight:bold; cursor:pointer;";
+        if(v === velSelAgro) b.style.borderColor = "#E31C24";
+
+        b.onclick = () => {
+            velSelAgro = v;
+            Array.from(divVel.children).forEach(btn => btn.style.borderColor = "#334155");
+            b.style.borderColor = "#E31C24";
+            calcularLogicaAgro();
+        };
+        divVel.appendChild(b);
+    });
+
+    // 3. Lógica Específica Agropainel
+    window.calcularLogicaAgro = function() {
+        const L = parseFloat(document.getElementById("agro_largura").value);
+        const espAgro = 0.60; // Fixo conforme pedido
+        const internoAgro = 200; // Fixo conforme pedido
+        const pi = 3.14;
+        
+        const largura_mm = L * 10;
+        const p1 = largura_mm / espAgro;
+        const p2 = p1 * pi;
+        const soma = internoAgro + largura_mm;
+        
+        const metros = Math.round((p2 * soma) / 1000);
+        const tempoTotalMin = Math.round(metros / velSelAgro);
+        
+        const fim = new Date();
+        fim.setMinutes(fim.getMinutes() + tempoTotalMin);
+        
+        const horas = Math.floor(tempoTotalMin / 60);
+        const minutos = tempoTotalMin % 60;
+        let textoTempo = (horas > 0) ? `${horas}h ${minutos}min` : `${minutos} min`;
+
+        document.getElementById("agro_res_metros").innerHTML = `Metros: <b>${metros} m</b>`;
+        document.getElementById("agro_res_tempo").innerHTML = `Tempo: <b>${textoTempo}</b>`;
+        document.getElementById("agro_res_hora").innerHTML = `Finaliza às: <b>${fim.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</b>`;
+    };
+
+    calcularLogicaAgro();
+}
+
