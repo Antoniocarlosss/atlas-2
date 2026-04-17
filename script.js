@@ -586,24 +586,585 @@ function renderizarMenuBobines() {
 }
 
 // Direcionamento das funções de Bobines
+/* ==========================================================================
+   MÓDULO: BOBINES (VERSÃO SEM EDITAR - APENAS STATUS E EXCLUIR)
+   ========================================================================== */
+
+let lancamentosTemporarios = [];
+let historicoBobines = JSON.parse(localStorage.getItem('historicoBobines')) || []; // Salva no navegador
+let producaoAtiva = 1; 
+let lancamentoAtual = { tipo: '', lado: '', subtipo: '', qtd: 1, numBobine: '', ral: '', status: '', producao: 1 };
+
 function moduloBobine(tipo) {
     const render = document.getElementById('render-modulo');
     
     switch(tipo) {
         case 'novo':
-            // Aqui chamaremos a função para criar o relatório (próximo passo)
-            render.innerHTML = `<h2 style="color:white; text-align:center;">Novo Relatório de Bobines</h2>`;
+            renderizarNovoRelatorio();
             break;
         case 'historico':
-            render.innerHTML = `<h2 style="color:white; text-align:center;">Histórico de Bobines</h2>`;
+            renderizarHistoricoBobines();
             break;
         case 'calculadora':
-            renderizarCalculadoraBobina(); // Vamos criar essa função a seguir
+            renderizarCalculadoraBobina();
             break;
-       case 'calculadora_agro':
-    renderizarCalculadoraAgro();
-    break;
+        case 'calculadora_agro':
+            renderizarCalculadoraAgro();
+            break;
     }
+}
+function renderizarNovoRelatorio() {
+    const render = document.getElementById('render-modulo');
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+    render.innerHTML = `
+        <div style="padding: 15px; color: white; max-width: 600px; margin: auto;">
+            <div style="background: #1e293b; padding: 20px; border-radius: 15px; border: 1px solid #334155;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3 style="color:#E31C24; margin:0;">NOVO LANÇAMENTO</h3>
+                    <span style="background:#0f172a; padding:5px 10px; border-radius:5px; font-size:12px;">${dataAtual}</span>
+                </div>
+
+                <label style="color:#94a3b8; font-size:12px;">O QUE DESEJA LANÇAR?</label>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:10px 0 20px 0;">
+                    <button onclick="setTipoLancamento('filme')" id="btn-filme" class="btn-opt">FILME</button>
+                    <button onclick="setTipoLancamento('chapa')" id="btn-chapa" class="btn-opt">BOBINA CHAPA</button>
+                </div>
+
+                <div id="area-configuracao"></div>
+
+                <button onclick="adicionarAoLancamento()" id="btn-add" style="display:none; width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:8px; font-weight:bold; margin-top:15px; cursor:pointer;">
+                    ADICIONAR AO LANÇAMENTO
+                </button>
+            </div>
+
+            <div id="lista-lancamentos" style="margin-top:20px;"></div>
+
+            <div id="acoes-finais" style="display:none; grid-template-columns: 1fr 1fr; gap:10px; margin-top:20px;">
+                <button onclick="encerrarProducao()" style="padding:15px; background:#3b82f6; color:white; border:none; border-radius:8px; font-weight:bold;">FIM PRODUÇÃO</button>
+                <button onclick="fecharDia()" style="padding:15px; background:#E31C24; color:white; border:none; border-radius:8px; font-weight:bold;">FECHAR DIA</button>
+            </div>
+        </div>
+
+        <style>
+            .btn-opt { padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; cursor:pointer; font-weight:bold; }
+            .btn-opt.active { border-color: #E31C24 !important; background: #2d1315 !important; }
+            .input-style { width:100%; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px; }
+            .item-lancado { background:#1e293b; padding:10px; border-radius:8px; margin-bottom:8px; border-left:4px solid #E31C24; display:flex; justify-content:space-between; align-items:center; }
+            .badge-status { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; margin-top: 5px; display: inline-block; }
+        </style>
+    `;
+    if(lancamentosTemporarios.length > 0) atualizarLista();
+}
+
+function setTipoLancamento(tipo) {
+    lancamentoAtual.tipo = tipo;
+    document.getElementById('btn-filme').classList.toggle('active', tipo === 'filme');
+    document.getElementById('btn-chapa').classList.toggle('active', tipo === 'chapa');
+    
+    const area = document.getElementById('area-configuracao');
+    document.getElementById('btn-add').style.display = 'block';
+
+    area.innerHTML = `
+        <label style="color:#94a3b8; font-size:12px; display:block; margin-top:10px;">POSIÇÃO</label>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin:5px 0 15px 0;">
+            <button onclick="setLado('superior')" class="btn-opt btn-lado">SUPERIOR</button>
+            <button onclick="setLado('inferior')" class="btn-opt btn-lado">INFERIOR</button>
+        </div>
+        <div id="detalhes-especificos"></div>
+    `;
+}
+
+function setLado(lado) {
+    lancamentoAtual.lado = lado;
+    document.querySelectorAll('.btn-lado').forEach(b => b.classList.toggle('active', b.innerText.toLowerCase() === lado));
+    
+    const areaDet = document.getElementById('detalhes-especificos');
+    
+    if(lancamentoAtual.tipo === 'filme') {
+        let html = (lado === 'inferior') ? `
+            <select id="subtipo_filme" class="input-style">
+                <option value="5 Ondas">5 Ondas</option>
+                <option value="Fachada Oculta">Fachada Oculta</option>
+                <option value="Telha Canudo">Telha Canudo</option>
+            </select>` : `<p style="font-size:13px; color:#94a3b8; margin-bottom:10px;">Tipo: 1060</p>`;
+        
+        html += `
+            <label style="display:block; margin-bottom:10px; font-size:12px; color:#94a3b8;">QUANTIDADE</label>
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:15px;">
+                ${[1,2,3,4].map(n => `<button type="button" onclick="setQtd(${n})" class="btn-opt btn-qtd">${n}</button>`).join('')}
+            </div>
+        `;
+        areaDet.innerHTML = html;
+        setQtd(1);
+    } else {
+        areaDet.innerHTML = `
+            <input type="text" id="num_bobine" placeholder="Nº DA BOBINA" class="input-style">
+            <select id="ral_chapa" class="input-style">
+                <option value="">SELECIONE O RAL</option>
+                <option value="3009">3009</option>
+                <option value="9010">9010</option>
+                <option value="7016">7016</option>
+                <option value="9006">9006</option>
+                <option value="6009">6009</option>
+            </select>
+            <label style="color:#94a3b8; font-size:12px;">ACABOU?</label>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px; margin-top:5px;">
+                <button onclick="setStatusForm('SIM')" class="btn-opt btn-status">SIM</button>
+                <button onclick="setStatusForm('NÃO')" class="btn-opt btn-status">NÃO</button>
+                <button onclick="setStatusForm('ANDAMENTO')" class="btn-opt btn-status">ANDAMENTO</button>
+            </div>
+        `;
+    }
+}
+
+function setQtd(n) {
+    lancamentoAtual.qtd = n;
+    document.querySelectorAll('.btn-qtd').forEach(b => b.classList.toggle('active', parseInt(b.innerText) === n));
+}
+
+function setStatusForm(status) {
+    lancamentoAtual.status = status;
+    document.querySelectorAll('.btn-status').forEach(b => b.classList.toggle('active', b.innerText === status));
+}
+
+function adicionarAoLancamento() {
+    if(!lancamentoAtual.lado) { alert('Selecione a posição!'); return; }
+
+    if(lancamentoAtual.tipo === 'filme') {
+        lancamentoAtual.subtipo = (lancamentoAtual.lado === 'superior') ? '1060' : document.getElementById('subtipo_filme').value;
+    } else {
+        lancamentoAtual.numBobine = document.getElementById('num_bobine').value;
+        lancamentoAtual.ral = document.getElementById('ral_chapa').value;
+        if(!lancamentoAtual.numBobine || !lancamentoAtual.ral || !lancamentoAtual.status) {
+            alert('Preencha todos os campos!'); return;
+        }
+    }
+
+    lancamentoAtual.producao = producaoAtiva;
+    lancamentosTemporarios.push({...lancamentoAtual});
+    
+    // Reset
+    lancamentoAtual = { tipo: '', lado: '', subtipo: '', qtd: 1, numBobine: '', ral: '', status: '', producao: producaoAtiva };
+    renderizarNovoRelatorio();
+}
+
+function atualizarLista() {
+    const lista = document.getElementById('lista-lancamentos');
+    lista.innerHTML = '';
+    let ultimaProd = 0;
+    
+    lancamentosTemporarios.forEach((item, index) => {
+        if(item.producao !== ultimaProd) {
+            lista.innerHTML += `<div style="color:#E31C24; font-weight:bold; margin: 15px 0 5px 0; font-size:12px; border-bottom:1px solid #334155;">PRODUÇÃO ${item.producao}</div>`;
+            ultimaProd = item.producao;
+        }
+
+        const corStatus = item.status === 'SIM' ? '#10b981' : (item.status === 'ANDAMENTO' ? '#f59e0b' : '#ef4444');
+
+        lista.innerHTML += `
+            <div class="item-lancado">
+                <div style="font-size:11px;">
+                    <b>${item.tipo.toUpperCase()} ${item.lado.toUpperCase()}</b><br>
+                    ${item.tipo === 'filme' ? 'Tipo: '+item.subtipo+' | Qtd: '+item.qtd : 'Bob: '+item.numBobine+' | RAL: '+item.ral}<br>
+                    ${item.tipo === 'chapa' ? `<span onclick="alternarStatus(${index})" class="badge-status" style="background:${corStatus}">${item.status}</span>` : ''}
+                </div>
+                <button onclick="removerLancamento(${index})" style="background:transparent; border:none; color:#ff4444; cursor:pointer;"><i class="fas fa-trash"></i></button>
+            </div>`;
+    });
+    document.getElementById('acoes-finais').style.display = 'grid';
+}
+
+function alternarStatus(index) {
+    const statusCiclo = ['ANDAMENTO', 'SIM', 'NÃO'];
+    let atual = lancamentosTemporarios[index].status;
+    let novoIndex = (statusCiclo.indexOf(atual) + 1) % statusCiclo.length;
+    lancamentosTemporarios[index].status = statusCiclo[novoIndex];
+    atualizarLista();
+}
+
+function removerLancamento(index) {
+    lancamentosTemporarios.splice(index, 1);
+    atualizarLista();
+}
+
+function encerrarProducao() {
+    producaoAtiva++;
+    alert("Próxima Produção: " + producaoAtiva);
+    atualizarLista();
+}
+
+// --- FUNÇÃO PARA SALVAR E GERAR PDF ---
+function fecharDia() {
+    const pendente = lancamentosTemporarios.find(i => i.tipo === 'chapa' && i.status === 'ANDAMENTO');
+    if(pendente) { alert("Erro: Existe uma bobina em ANDAMENTO."); return; }
+
+    if(lancamentosTemporarios.length === 0) { alert("Erro: Sem dados para fechar o dia."); return; }
+
+    const operadorSistema = window.usuarioLogado || "OPERADOR NÃO IDENTIFICADO";
+
+    const hoje = new Date();
+
+    const relFinal = {
+        id: Date.now(),
+        data: hoje.toLocaleDateString('pt-BR'),
+        ano: hoje.getFullYear(),
+        mes: hoje.getMonth() + 1,
+        dia: hoje.getDate(),
+        hora: hoje.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
+        operador: operadorSistema.toUpperCase(),
+        itens: [...lancamentosTemporarios]
+    };
+
+    historicoBobines.unshift(relFinal);
+    localStorage.setItem('historicoBobines', JSON.stringify(historicoBobines));
+
+    gerarPDF_Bobines(encodeURIComponent(JSON.stringify(relFinal)));
+
+    lancamentosTemporarios = [];
+    producaoAtiva = 1;
+    renderizarMenuBobines();
+}
+//FUNÇÃO PARA RENDERIZAR O HISTÓRICO NA TELA ---
+function renderizarHistoricoBobines() {
+    const render = document.getElementById('render-modulo');
+
+    let agrupado = {};
+
+    historicoBobines.forEach(rel => {
+        if (!agrupado[rel.ano]) agrupado[rel.ano] = {};
+        if (!agrupado[rel.ano][rel.mes]) agrupado[rel.ano][rel.mes] = [];
+        agrupado[rel.ano][rel.mes].push(rel);
+    });
+
+    const mesesNome = ["", "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+
+    let html = `<div style="padding:15px; color:white;">`;
+
+    Object.keys(agrupado).sort((a,b)=>b-a).forEach(ano => {
+        html += `<div style="margin-bottom:10px;">
+                    <div style="background:#1e293b; padding:10px; border-radius:5px; font-weight:bold;">
+                        📂 ${ano}
+                    </div>`;
+
+        Object.keys(agrupado[ano]).sort((a,b)=>b-a).forEach(mes => {
+            html += `
+                <div onclick="toggleMes('${ano}-${mes}')" style="cursor:pointer; padding-left:10px; color:#3b82f6;">
+                    🗓️ ${mesesNome[mes]}
+                </div>
+                <div id="mes-${ano}-${mes}" style="display:none; padding-left:20px;">
+            `;
+
+            agrupado[ano][mes].forEach(rel => {
+                html += `
+                    <div style="margin:5px 0; display:flex; justify-content:space-between;">
+                        <span>📄 ${rel.dia}/${rel.mes} - ${rel.operador}</span>
+                        <button onclick='gerarPDF_Bobines("${encodeURIComponent(JSON.stringify(rel))}")'>PDF</button>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+        });
+
+        html += `</div>`;
+    });
+
+    html += `</div>`;
+    render.innerHTML = html;
+}
+
+function toggleMes(id) {
+    const el = document.getElementById('mes-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function agruparPorRal(itens) {
+    let grupos = {};
+
+    itens.forEach(item => {
+        if(item.tipo !== 'chapa') return;
+
+        if(!grupos[item.ral]) {
+            grupos[item.ral] = { superior: [], inferior: [] };
+        }
+
+        grupos[item.ral][item.lado].push(item);
+    });
+
+    return grupos;
+}
+
+function calcularTotais(itens) {
+    let totalFilmeSup = 0;
+    let totalFilmeInf = 0;
+    let totalBobSup = 0;
+    let totalBobInf = 0;
+
+    itens.forEach(i => {
+        if(i.tipo === 'filme') {
+            if(i.lado === 'superior') totalFilmeSup += i.qtd;
+            else totalFilmeInf += i.qtd;
+        }
+
+        if(i.tipo === 'chapa') {
+            if(i.lado === 'superior') totalBobSup++;
+            else totalBobInf++;
+        }
+    });
+
+    return { totalFilmeSup, totalFilmeInf, totalBobSup, totalBobInf };
+}
+function deletarHistoricoBobine(index) {
+    if(confirm("Excluir este relatório permanentemente?")) {
+        historicoBobines.splice(index, 1);
+        localStorage.setItem('historicoBobines', JSON.stringify(historicoBobines));
+        renderizarHistoricoBobines();
+    }
+}
+
+// Mantenha suas funções de renderizarNovoRelatorio, atualizarLista, adicionarAoLancamento e as calculadoras EXATAMENTE como você já tem.
+// Apenas certifique-se de que a função fecharDia e a gerarPDF_Bobines estejam como abaixo:
+
+function gerarPDF_Bobines(dadosEncoded) {
+    const rel = JSON.parse(decodeURIComponent(dadosEncoded));
+    const janela = window.open('', '_blank');
+
+    // 🔥 PEGA USUÁRIO CORRETO
+    const operador = rel.operador || window.userLogado?.nome || window.userLogado || "OPERADOR NÃO IDENTIFICADO";
+
+    const grupos = agruparPorRal(rel.itens);
+    const totais = calcularTotais(rel.itens);
+
+    // =====================
+    // FILMES
+    // =====================
+    let tabelaFilmes = '';
+
+    rel.itens.filter(i => i.tipo === 'filme').forEach(i => {
+        tabelaFilmes += `
+            <tr>
+                <td>${i.lado.toUpperCase()}</td>
+                <td>${i.subtipo}</td>
+                <td>${i.qtd}</td>
+            </tr>
+        `;
+    });
+
+    // =====================
+    // BOBINAS
+    // =====================
+    let tabelaBobinas = '';
+
+    Object.keys(grupos).forEach(ral => {
+
+        tabelaBobinas += `
+            <tr style="background:#eee; font-weight:bold;">
+                <td colspan="4">RAL ${ral}</td>
+            </tr>
+        `;
+
+        grupos[ral].superior.forEach(i => {
+            tabelaBobinas += `
+                <tr>
+                    <td>SUPERIOR</td>
+                    <td>${i.numBobine}</td>
+                    <td>${i.status}</td>
+                    <td>${ral}</td>
+                </tr>
+            `;
+        });
+
+        grupos[ral].inferior.forEach(i => {
+            tabelaBobinas += `
+                <tr>
+                    <td>INFERIOR</td>
+                    <td>${i.numBobine}</td>
+                    <td>${i.status}</td>
+                    <td>${ral}</td>
+                </tr>
+            `;
+        });
+
+    });
+
+    janela.document.write(`
+        <html>
+        <head>
+            <style>
+
+                @page {
+                    size: A4;
+                    margin: 10mm;
+                }
+
+                body {
+                    font-family: Arial;
+                    margin: 0;
+                    padding: 0;
+                }
+
+                .topo {
+                    background: #000;
+                    color: #fff;
+                    padding: 15px;
+                    display: flex;
+                    justify-content: space-between;
+                }
+
+                .logo {
+                    font-size: 22px;
+                    font-weight: bold;
+                }
+
+                .sublogo {
+                    font-size: 10px;
+                    border-left: 1px solid #fff;
+                    padding-left: 10px;
+                    margin-left: 10px;
+                }
+
+                .barra {
+                    height: 5px;
+                    background: #E31C24;
+                }
+
+                .container {
+                    padding: 20px;
+                }
+
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 10px;
+                }
+
+                th {
+                    background: #d1d5db;
+                    border: 1px solid #000;
+                    padding: 8px;
+                    font-size: 12px;
+                }
+
+                td {
+                    border: 1px solid #000;
+                    padding: 6px;
+                    text-align: center;
+                    font-size: 12px;
+                }
+
+                h3 {
+                    margin-top: 20px;
+                }
+
+                .total {
+                    margin-top: 20px;
+                    border: 2px solid #000;
+                    padding: 15px;
+                    text-align: center;
+                }
+
+                .total strong {
+                    color: #E31C24;
+                    font-size: 18px;
+                }
+
+                .assinatura {
+                    margin-top: 50px;
+                    text-align: center;
+                }
+
+                .linha {
+                    border-top: 1px solid #000;
+                    width: 60%;
+                    margin: 40px auto 5px auto;
+                }
+
+                .btn-print {
+                    text-align: center;
+                    margin-top: 20px;
+                }
+
+                .btn-print button {
+                    background: #000;
+                    color: #fff;
+                    border: 2px solid #E31C24;
+                    padding: 15px 30px;
+                    cursor: pointer;
+                    font-weight: bold;
+                }
+
+                @media print {
+                    .btn-print {
+                        display: none;
+                    }
+                }
+
+            </style>
+        </head>
+
+        <body>
+
+            <div class="topo">
+                <div style="display:flex; align-items:center;">
+                    <div class="logo">ATLAS</div>
+                    <div class="sublogo">PAINEL</div>
+                </div>
+                <div><b>RELATÓRIO DE BOBINES</b></div>
+            </div>
+
+            <div class="barra"></div>
+
+            <div class="container">
+
+                <h3>FILMES</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>POSIÇÃO</th>
+                            <th>TIPO</th>
+                            <th>QTD</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tabelaFilmes}
+                    </tbody>
+                </table>
+
+                <h3>BOBINAS</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>POSIÇÃO</th>
+                            <th>Nº BOBINA</th>
+                            <th>STATUS</th>
+                            <th>RAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tabelaBobinas}
+                    </tbody>
+                </table>
+
+                <div class="total">
+                    TOTAL FILME: <strong>${totais.totalFilmeSup + totais.totalFilmeInf}</strong><br>
+                    SUP: ${totais.totalFilmeSup} | INF: ${totais.totalFilmeInf}<br><br>
+                    Finalizado por: <b>${operador}</b> em ${rel.data}
+                </div>
+
+                <div class="assinatura">
+                    <div class="linha"></div>
+                    Assinatura: ${operador}
+                </div>
+
+                <div class="btn-print">
+                    <button onclick="window.print()">🖨️ CONFIRMAR E GERAR PDF</button>
+                </div>
+
+            </div>
+
+        </body>
+        </html>
+    `);
 }
 function renderizarCalculadoraBobina() {
     const render = document.getElementById('render-modulo');
@@ -633,6 +1194,135 @@ function renderizarCalculadoraBobina() {
             </div>
         </div>
     `;
+    function gerarPDF_Bobines(dadosEncoded) {
+    const rel = JSON.parse(decodeURIComponent(dadosEncoded));
+    const janela = window.open('', '_blank');
+
+    let conteudoGeral = "";
+    
+    // Agrupar itens por Produção
+    const producoes = {};
+    rel.itens.forEach(item => {
+        if (!producoes[item.producao]) producoes[item.producao] = [];
+        producoes[item.producao].push(item);
+    });
+
+    // Gerar o conteúdo para cada Produção
+    Object.keys(producoes).forEach(numProd => {
+        let itensFilme = producoes[numProd].filter(i => i.tipo === 'filme');
+        let itensChapa = producoes[numProd].filter(i => i.tipo === 'chapa');
+
+        conteudoGeral += `<div style="margin-bottom: 30px; border: 1px solid #ccc; padding: 10px; border-radius: 5px;">
+            <h3 style="background: #E31C24; color: white; padding: 5px 10px; margin-top: 0;">PRODUÇÃO ${numProd}</h3>`;
+
+        // Tabela de Filmes da Produção
+        if (itensFilme.length > 0) {
+            conteudoGeral += `
+                <p style="font-weight: bold; margin-bottom: 5px;">🎥 LANÇAMENTO DE FILMES:</p>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead>
+                        <tr style="background: #e2e8f0;">
+                            <th style="border: 1px solid #000; padding: 5px;">POSIÇÃO</th>
+                            <th style="border: 1px solid #000; padding: 5px;">TIPO DE FILME</th>
+                            <th style="border: 1px solid #000; padding: 5px;">QUANTIDADE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itensFilme.map(f => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${f.lado.toUpperCase()}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${f.subtipo}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center; font-weight:bold;">${f.qtd}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+        }
+
+        // Tabela de Chapas da Produção
+        if (itensChapa.length > 0) {
+            conteudoGeral += `
+                <p style="font-weight: bold; margin-bottom: 5px;">🏗️ LANÇAMENTO DE BOBINAS (CHAPA):</p>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #e2e8f0;">
+                            <th style="border: 1px solid #000; padding: 5px;">POSIÇÃO</th>
+                            <th style="border: 1px solid #000; padding: 5px;">Nº BOBINA</th>
+                            <th style="border: 1px solid #000; padding: 5px;">RAL</th>
+                            <th style="border: 1px solid #000; padding: 5px;">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itensChapa.map(c => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${c.lado.toUpperCase()}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${c.numBobine}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${c.ral}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center; font-weight:bold; color: ${c.status === 'SIM' ? 'green' : 'red'};">${c.status}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+        }
+
+        conteudoGeral += `</div>`;
+    });
+
+    janela.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Relatório de Bobines - ATLAS</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+                .header-container { background: #000; color: #fff; padding: 15px; border-bottom: 5px solid #E31C24; display: flex; justify-content: space-between; align-items: center; }
+                .logo-bar { width: 30px; height: 8px; background: #E31C24; margin-bottom: 4px; }
+                .text-atlas { font-family: 'Arial Black', sans-serif; font-size: 24px; line-height: 1; }
+                .main-content { padding: 20px; }
+                th { font-size: 12px; }
+                td { font-size: 13px; }
+                .resumo-dia { background: #f2f2f2; border: 2px solid #000; padding: 15px; margin-top: 20px; }
+                @media print { .no-print { display: none; } }
+            </style>
+        </head>
+        <body>
+            <div class="header-container">
+                <div style="display: flex; align-items: center;">
+                    <div style="margin-right:10px;"><div class="logo-bar"></div><div class="logo-bar"></div></div>
+                    <div><span class="text-atlas">ATLAS</span><br><span style="font-size:9px; letter-spacing:4px;">P A I N E L</span></div>
+                </div>
+                <div style="text-align: right;">
+                    <h2 style="margin:0; font-size: 16px;">RELATÓRIO DE BOBINES/FILME</h2>
+                    <p style="margin:0; font-size: 12px;">DATA: ${rel.data}</p>
+                </div>
+            </div>
+
+            <div class="main-content">
+                ${conteudoGeral}
+
+                <div class="resumo-dia">
+                    <p style="margin: 5px 0;">Operador: <b>${rel.operador}</b></p>
+                    <p style="margin: 5px 0;">Total de Produções no Dia: <b>${Object.keys(producoes).length}</b></p>
+                </div>
+
+                <div style="margin-top: 40px; text-align: center;">
+                    <div style="border-top: 1px solid #000; width: 60%; margin: 0 auto; padding-top: 5px;">
+                        Assinatura Responsável
+                    </div>
+                </div>
+
+                <div class="no-print" style="margin-top: 30px; text-align: center;">
+                    <button onclick="window.print()" style="padding: 15px 30px; background: #000; color: #fff; border: 2px solid #E31C24; font-weight: bold; cursor: pointer; border-radius: 8px;">
+                        🖨️ IMPRIMIR RELATÓRIO
+                    </button>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+    janela.document.close();
+}
 
     // 1. Popular Larguras (1 a 50cm)
     const selLargura = document.getElementById("calc_largura");
@@ -798,4 +1488,3 @@ function renderizarCalculadoraAgro() {
 
     calcularLogicaAgro();
 }
-
