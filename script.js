@@ -618,14 +618,21 @@ function moduloBobine(tipo) {
 }
 function renderizarNovoRelatorio() {
     const render = document.getElementById('render-modulo');
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    // Mantém a data de hoje como padrão se for o primeiro acesso
+    const dataHojeIso = new Date().toISOString().split('T')[0]; 
 
     render.innerHTML = `
         <div style="padding: 15px; color: white; max-width: 600px; margin: auto;">
             <div style="background: #1e293b; padding: 20px; border-radius: 15px; border: 1px solid #334155;">
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:#0f172a; padding:10px; border-radius:10px; border:1px solid #3b82f6;">
+                    <div style="font-size:11px; color:#3b82f6; font-weight:bold;">DATA DE TRABALHO:</div>
+                    <input type="date" id="data-retroativa" value="${dataHojeIso}" 
+                        style="background:transparent; color:white; border:none; font-family:Arial; font-weight:bold; cursor:pointer; outline:none;">
+                </div>
+
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h3 style="color:#E31C24; margin:0;">NOVO LANÇAMENTO</h3>
-                    <span style="background:#0f172a; padding:5px 10px; border-radius:5px; font-size:12px;">${dataAtual}</span>
                 </div>
 
                 <label style="color:#94a3b8; font-size:12px;">O QUE DESEJA LANÇAR?</label>
@@ -644,8 +651,8 @@ function renderizarNovoRelatorio() {
             <div id="lista-lancamentos" style="margin-top:20px;"></div>
 
             <div id="acoes-finais" style="display:none; grid-template-columns: 1fr 1fr; gap:10px; margin-top:20px;">
-                <button onclick="encerrarProducao()" style="padding:15px; background:#3b82f6; color:white; border:none; border-radius:8px; font-weight:bold;">FIM PRODUÇÃO</button>
-                <button onclick="fecharDia()" style="padding:15px; background:#E31C24; color:white; border:none; border-radius:8px; font-weight:bold;">FECHAR DIA</button>
+                <button onclick="encerrarProducao()" style="padding:15px; background:#3b82f6; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">FIM PRODUÇÃO</button>
+                <button onclick="fecharDia()" style="padding:15px; background:#E31C24; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">FECHAR DIA</button>
             </div>
         </div>
 
@@ -801,32 +808,43 @@ function encerrarProducao() {
 function fecharDia() {
     const pendente = lancamentosTemporarios.find(i => i.tipo === 'chapa' && i.status === 'ANDAMENTO');
     if(pendente) { alert("Erro: Existe uma bobina em ANDAMENTO."); return; }
-
     if(lancamentosTemporarios.length === 0) { alert("Erro: Sem dados para fechar o dia."); return; }
+
+    // Pega a data do input manual
+    const dataInput = document.getElementById('data-retroativa').value;
+    let dataRef = new Date(); // padrão hoje
+
+    if(dataInput) {
+        const partes = dataInput.split('-');
+        // Criamos a data ajustando o fuso horário local
+        dataRef = new Date(partes[0], partes[1] - 1, partes[2]);
+    }
 
     const operadorSistema = window.usuarioLogado || "OPERADOR NÃO IDENTIFICADO";
 
-    const hoje = new Date();
-
     const relFinal = {
         id: Date.now(),
-        data: hoje.toLocaleDateString('pt-BR'),
-        ano: hoje.getFullYear(),
-        mes: hoje.getMonth() + 1,
-        dia: hoje.getDate(),
-        hora: hoje.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
+        data: dataRef.toLocaleDateString('pt-BR'),
+        ano: dataRef.getFullYear(),
+        mes: dataRef.getMonth() + 1,
+        dia: dataRef.getDate(),
+        hora: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
         operador: operadorSistema.toUpperCase(),
         itens: [...lancamentosTemporarios]
     };
 
+    // Salva no histórico
     historicoBobines.unshift(relFinal);
     localStorage.setItem('historicoBobines', JSON.stringify(historicoBobines));
 
+    // Gera PDF
     gerarPDF_Bobines(encodeURIComponent(JSON.stringify(relFinal)));
 
+    // Limpa tudo
     lancamentosTemporarios = [];
     producaoAtiva = 1;
     renderizarMenuBobines();
+    alert("Relatório fechado com sucesso na data: " + relFinal.data);
 }
 //FUNÇÃO PARA RENDERIZAR O HISTÓRICO NA TELA ---
 function renderizarHistoricoBobines() {
@@ -948,242 +966,128 @@ function gerarPDF_Bobines(dadosEncoded) {
     const rel = JSON.parse(decodeURIComponent(dadosEncoded));
     const janela = window.open('', '_blank');
 
-    // 🔥 PEGA USUÁRIO CORRETO
-    const operador = rel.operador || window.userLogado?.nome || window.userLogado || "OPERADOR NÃO IDENTIFICADO";
-
-    const grupos = agruparPorRal(rel.itens);
-    const totais = calcularTotais(rel.itens);
-
-    // =====================
-    // FILMES
-    // =====================
-    let tabelaFilmes = '';
-
-    rel.itens.filter(i => i.tipo === 'filme').forEach(i => {
-        tabelaFilmes += `
-            <tr>
-                <td>${i.lado.toUpperCase()}</td>
-                <td>${i.subtipo}</td>
-                <td>${i.qtd}</td>
-            </tr>
-        `;
+    let conteudoGeral = "";
+    
+    const producoes = {};
+    rel.itens.forEach(item => {
+        if (!producoes[item.producao]) producoes[item.producao] = [];
+        producoes[item.producao].push(item);
     });
 
-    // =====================
-    // BOBINAS
-    // =====================
-    let tabelaBobinas = '';
+    Object.keys(producoes).forEach(numProd => {
+        let itensFilme = producoes[numProd].filter(i => i.tipo === 'filme');
+        let itensChapa = producoes[numProd].filter(i => i.tipo === 'chapa');
 
-    Object.keys(grupos).forEach(ral => {
+        conteudoGeral += `
+            <div style="margin-bottom: 30px; border: 1px solid #ccc; padding: 10px; border-radius: 5px;">
+                <h3 style="background: #E31C24; color: white; padding: 8px; margin-top: 0; text-align: center !important; font-family: Arial, sans-serif;">PRODUÇÃO ${numProd}</h3>`;
 
-        tabelaBobinas += `
-            <tr style="background:#eee; font-weight:bold;">
-                <td colspan="4">RAL ${ral}</td>
-            </tr>
-        `;
+        if (itensFilme.length > 0) {
+            conteudoGeral += `
+                <div style="text-align: center !important; width: 100%; margin: 15px 0 5px 0;">
+                    <strong style="font-size: 16px; font-family: Arial, sans-serif;">🎥 LANÇAMENTO DE FILMES</strong>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                    <thead>
+                        <tr style="background: #e2e8f0;">
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">POSIÇÃO</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">TIPO DE FILME</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">QUANTIDADE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itensFilme.map(f => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${f.lado.toUpperCase()}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${f.subtipo}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center; font-weight:bold;">${f.qtd}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+        }
 
-        grupos[ral].superior.forEach(i => {
-            tabelaBobinas += `
-                <tr>
-                    <td>SUPERIOR</td>
-                    <td>${i.numBobine}</td>
-                    <td>${i.status}</td>
-                    <td>${ral}</td>
-                </tr>
-            `;
-        });
-
-        grupos[ral].inferior.forEach(i => {
-            tabelaBobinas += `
-                <tr>
-                    <td>INFERIOR</td>
-                    <td>${i.numBobine}</td>
-                    <td>${i.status}</td>
-                    <td>${ral}</td>
-                </tr>
-            `;
-        });
-
+        if (itensChapa.length > 0) {
+            conteudoGeral += `
+                <div style="text-align: center !important; width: 100%; margin: 15px 0 5px 0;">
+                    <strong style="font-size: 16px; font-family: Arial, sans-serif;">🏗️ LANÇAMENTO DE BOBINAS (CHAPA)</strong>
+                </div>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #e2e8f0;">
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">POSIÇÃO</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">Nº BOBINA</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">RAL</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itensChapa.map(c => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${c.lado.toUpperCase()}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${c.numBobine}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center;">${c.ral}</td>
+                                <td style="border: 1px solid #000; padding: 5px; text-align:center; font-weight:bold; color: ${c.status === 'SIM' ? 'green' : 'red'};">${c.status}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+        }
+        conteudoGeral += `</div>`;
     });
 
     janela.document.write(`
+        <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <style>
-
-                @page {
-                    size: A4;
-                    margin: 10mm;
-                }
-
-                body {
-                    font-family: Arial;
-                    margin: 0;
-                    padding: 0;
-                }
-
-                .topo {
-                    background: #000;
-                    color: #fff;
-                    padding: 15px;
-                    display: flex;
-                    justify-content: space-between;
-                }
-
-                .logo {
-                    font-size: 22px;
-                    font-weight: bold;
-                }
-
-                .sublogo {
-                    font-size: 10px;
-                    border-left: 1px solid #fff;
-                    padding-left: 10px;
-                    margin-left: 10px;
-                }
-
-                .barra {
-                    height: 5px;
-                    background: #E31C24;
-                }
-
-                .container {
-                    padding: 20px;
-                }
-
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 10px;
-                }
-
-                th {
-                    background: #d1d5db;
-                    border: 1px solid #000;
-                    padding: 8px;
-                    font-size: 12px;
-                }
-
-                td {
-                    border: 1px solid #000;
-                    padding: 6px;
-                    text-align: center;
-                    font-size: 12px;
-                }
-
-                h3 {
-                    margin-top: 20px;
-                }
-
-                .total {
-                    margin-top: 20px;
-                    border: 2px solid #000;
-                    padding: 15px;
-                    text-align: center;
-                }
-
-                .total strong {
-                    color: #E31C24;
-                    font-size: 18px;
-                }
-
-                .assinatura {
-                    margin-top: 50px;
-                    text-align: center;
-                }
-
-                .linha {
-                    border-top: 1px solid #000;
-                    width: 60%;
-                    margin: 40px auto 5px auto;
-                }
-
-                .btn-print {
-                    text-align: center;
-                    margin-top: 20px;
-                }
-
-                .btn-print button {
-                    background: #000;
-                    color: #fff;
-                    border: 2px solid #E31C24;
-                    padding: 15px 30px;
-                    cursor: pointer;
-                    font-weight: bold;
-                }
-
-                @media print {
-                    .btn-print {
-                        display: none;
-                    }
-                }
-
+                body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+                .header-container { background: #000; color: #fff; padding: 15px; border-bottom: 5px solid #E31C24; display: flex; justify-content: space-between; align-items: center; }
+                .logo-bar { width: 30px; height: 8px; background: #E31C24; margin-bottom: 4px; }
+                .text-atlas { font-family: 'Arial Black', sans-serif; font-size: 24px; line-height: 1; }
+                .main-content { padding: 20px; }
+                th { background: #e2e8f0; text-align: center !important; }
+                .resumo-dia { background: #f2f2f2; border: 2px solid #000; padding: 15px; margin-top: 20px; text-align: center !important; }
+                .btn-imprimir { padding: 15px 30px; background: #000; color: #fff; border: 2px solid #E31C24; font-weight: bold; cursor: pointer; border-radius: 8px; font-size: 14px; }
+                @media print { .no-print { display: none; } }
             </style>
         </head>
-
         <body>
-
-            <div class="topo">
-                <div style="display:flex; align-items:center;">
-                    <div class="logo">ATLAS</div>
-                    <div class="sublogo">PAINEL</div>
+            <div class="header-container">
+                <div style="display: flex; align-items: center;">
+                    <div style="margin-right:10px;"><div class="logo-bar"></div><div class="logo-bar"></div></div>
+                    <div><span class="text-atlas">ATLAS</span><br><span style="font-size:9px; letter-spacing:4px;">P A I N E L</span></div>
                 </div>
-                <div><b>RELATÓRIO DE BOBINES</b></div>
+                <div style="text-align: right;">
+                    <h2 style="margin:0; font-size: 16px;">RELATÓRIO DE BOBINES/FILME</h2>
+                    <p style="margin:0; font-size: 12px;">DATA: ${rel.data}</p>
+                </div>
             </div>
 
-            <div class="barra"></div>
+            <div class="main-content">
+                ${conteudoGeral}
 
-            <div class="container">
-
-                <h3>FILMES</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>POSIÇÃO</th>
-                            <th>TIPO</th>
-                            <th>QTD</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tabelaFilmes}
-                    </tbody>
-                </table>
-
-                <h3>BOBINAS</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>POSIÇÃO</th>
-                            <th>Nº BOBINA</th>
-                            <th>STATUS</th>
-                            <th>RAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tabelaBobinas}
-                    </tbody>
-                </table>
-
-                <div class="total">
-                    TOTAL FILME: <strong>${totais.totalFilmeSup + totais.totalFilmeInf}</strong><br>
-                    SUP: ${totais.totalFilmeSup} | INF: ${totais.totalFilmeInf}<br><br>
-                    Finalizado por: <b>${operador}</b> em ${rel.data}
+                <div class="resumo-dia">
+                    <p style="margin: 5px 0; font-size: 14px;">Operador: <b>${rel.operador}</b> | Total de Produções: <b>${Object.keys(producoes).length}</b></p>
                 </div>
 
-                <div class="assinatura">
-                    <div class="linha"></div>
-                    Assinatura: ${operador}
+                <div style="margin-top: 40px; text-align: center;">
+                    <div style="border-top: 1px solid #000; width: 60%; margin: 0 auto; padding-top: 5px; font-size: 14px;">
+                        Assinatura Responsável: <b>${rel.operador}</b>
+                    </div>
                 </div>
 
-                <div class="btn-print">
-                    <button onclick="window.print()">🖨️ CONFIRMAR E GERAR PDF</button>
+                <div class="no-print" style="margin-top: 30px; text-align: center;">
+                    <button onclick="window.print()" class="btn-imprimir">
+                        🖨️ CONFIRMAR E GERAR PDF
+                    </button>
                 </div>
-
             </div>
-
         </body>
         </html>
     `);
+    janela.document.close();
 }
 function renderizarCalculadoraBobina() {
     const render = document.getElementById('render-modulo');
@@ -1213,37 +1117,36 @@ function renderizarCalculadoraBobina() {
             </div>
         </div>
     `;
-    function gerarPDF_Bobines(dadosEncoded) {
+   function gerarPDF_Bobines(dadosEncoded) {
     const rel = JSON.parse(decodeURIComponent(dadosEncoded));
     const janela = window.open('', '_blank');
 
     let conteudoGeral = "";
     
-    // Agrupar itens por Produção
     const producoes = {};
     rel.itens.forEach(item => {
         if (!producoes[item.producao]) producoes[item.producao] = [];
         producoes[item.producao].push(item);
     });
 
-    // Gerar o conteúdo para cada Produção
     Object.keys(producoes).forEach(numProd => {
         let itensFilme = producoes[numProd].filter(i => i.tipo === 'filme');
         let itensChapa = producoes[numProd].filter(i => i.tipo === 'chapa');
 
-        conteudoGeral += `<div style="margin-bottom: 30px; border: 1px solid #ccc; padding: 10px; border-radius: 5px;">
-            <h3 style="background: #E31C24; color: white; padding: 5px 10px; margin-top: 0;">PRODUÇÃO ${numProd}</h3>`;
+        conteudoGeral += `
+            <div style="margin-bottom: 30px; border: 1px solid #ccc; padding: 10px; border-radius: 5px;">
+                <h3 style="background: #E31C24; color: white; padding: 5px 10px; margin-top: 0; text-align: center;">PRODUÇÃO ${numProd}</h3>`;
 
-        // Tabela de Filmes da Produção
+        // Tabela de Filmes
         if (itensFilme.length > 0) {
             conteudoGeral += `
-                <p style="font-weight: bold; margin-bottom: 5px;">🎥 LANÇAMENTO DE FILMES:</p>
+                <p style="font-weight: bold; margin-bottom: 5px; text-align: center;"> LANÇAMENTO DE FILMES</p>
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
                     <thead>
                         <tr style="background: #e2e8f0;">
-                            <th style="border: 1px solid #000; padding: 5px;">POSIÇÃO</th>
-                            <th style="border: 1px solid #000; padding: 5px;">TIPO DE FILME</th>
-                            <th style="border: 1px solid #000; padding: 5px;">QUANTIDADE</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center;">POSIÇÃO</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center;">TIPO DE FILME</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center;">QUANTIDADE</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1258,17 +1161,17 @@ function renderizarCalculadoraBobina() {
                 </table>`;
         }
 
-        // Tabela de Chapas da Produção
+        // Tabela de Chapas
         if (itensChapa.length > 0) {
             conteudoGeral += `
-                <p style="font-weight: bold; margin-bottom: 5px;">🏗️ LANÇAMENTO DE BOBINAS (CHAPA):</p>
+                <p style="font-weight: bold; margin-bottom: 5px; text-align: center;"> LANÇAMENTO DE BOBINAS (CHAPA)</p>
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr style="background: #e2e8f0;">
-                            <th style="border: 1px solid #000; padding: 5px;">POSIÇÃO</th>
-                            <th style="border: 1px solid #000; padding: 5px;">Nº BOBINA</th>
-                            <th style="border: 1px solid #000; padding: 5px;">RAL</th>
-                            <th style="border: 1px solid #000; padding: 5px;">STATUS</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center;">POSIÇÃO</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center;">Nº BOBINA</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center;">RAL</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center;">STATUS</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1299,9 +1202,9 @@ function renderizarCalculadoraBobina() {
                 .logo-bar { width: 30px; height: 8px; background: #E31C24; margin-bottom: 4px; }
                 .text-atlas { font-family: 'Arial Black', sans-serif; font-size: 24px; line-height: 1; }
                 .main-content { padding: 20px; }
-                th { font-size: 12px; }
+                th { font-size: 12px; text-align: center; } /* Força centralização global dos headers */
                 td { font-size: 13px; }
-                .resumo-dia { background: #f2f2f2; border: 2px solid #000; padding: 15px; margin-top: 20px; }
+                .resumo-dia { background: #f2f2f2; border: 2px solid #000; padding: 15px; margin-top: 20px; text-align: center; }
                 @media print { .no-print { display: none; } }
             </style>
         </head>
@@ -1311,7 +1214,7 @@ function renderizarCalculadoraBobina() {
                     <div style="margin-right:10px;"><div class="logo-bar"></div><div class="logo-bar"></div></div>
                     <div><span class="text-atlas">ATLAS</span><br><span style="font-size:9px; letter-spacing:4px;">P A I N E L</span></div>
                 </div>
-                <div style="text-align: right;">
+                <div style="text-align: center;">
                     <h2 style="margin:0; font-size: 16px;">RELATÓRIO DE BOBINES/FILME</h2>
                     <p style="margin:0; font-size: 12px;">DATA: ${rel.data}</p>
                 </div>
@@ -1342,6 +1245,7 @@ function renderizarCalculadoraBobina() {
     `);
     janela.document.close();
 }
+//a soma da calculadora
 
     // 1. Popular Larguras (1 a 50cm)
     const selLargura = document.getElementById("calc_largura");
