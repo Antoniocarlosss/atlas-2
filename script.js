@@ -985,7 +985,7 @@ function gerarPDF_Bobines(dadosEncoded) {
         if (itensFilme.length > 0) {
             conteudoGeral += `
                 <div style="text-align: center !important; width: 100%; margin: 15px 0 5px 0;">
-                    <strong style="font-size: 16px; font-family: Arial, sans-serif;">🎥 LANÇAMENTO DE FILMES</strong>
+                    <strong style="font-size: 16px; font-family: Arial, sans-serif;"> LANÇAMENTO DE FILMES</strong>
                 </div>
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
                     <thead>
@@ -1010,7 +1010,7 @@ function gerarPDF_Bobines(dadosEncoded) {
         if (itensChapa.length > 0) {
             conteudoGeral += `
                 <div style="text-align: center !important; width: 100%; margin: 15px 0 5px 0;">
-                    <strong style="font-size: 16px; font-family: Arial, sans-serif;">🏗️ LANÇAMENTO DE BOBINAS (CHAPA)</strong>
+                    <strong style="font-size: 16px; font-family: Arial, sans-serif;"> LANÇAMENTO DE BOBINAS (CHAPA)</strong>
                 </div>
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
@@ -1018,7 +1018,7 @@ function gerarPDF_Bobines(dadosEncoded) {
                             <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">POSIÇÃO</th>
                             <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">Nº BOBINA</th>
                             <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">RAL</th>
-                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">STATUS</th>
+                            <th style="border: 1px solid #000; padding: 5px; text-align: center !important;">STATUS DE TERMINADA</th>
                         </tr>
                     </thead>
                     <tbody>
