@@ -345,7 +345,10 @@ function finalizarTurno(modulo) {
 function exibirHistoricoModulo(modulo) {
     const db = JSON.parse(localStorage.getItem('atlas_db')) || {};
     const render = document.getElementById('render-modulo');
-    let html = "";
+    let html = `
+        <div style="padding:15px; color:white;">
+            <h2 style="border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">📂 Histórico da injeççao</h2>
+    `;
 
     for(let ano in db) {
         html += `
@@ -828,9 +831,9 @@ function fecharDia() {
 //FUNÇÃO PARA RENDERIZAR O HISTÓRICO NA TELA ---
 function renderizarHistoricoBobines() {
     const render = document.getElementById('render-modulo');
-
     let agrupado = {};
 
+    // Agrupa os dados
     historicoBobines.forEach(rel => {
         if (!agrupado[rel.ano]) agrupado[rel.ano] = {};
         if (!agrupado[rel.ano][rel.mes]) agrupado[rel.ano][rel.mes] = [];
@@ -839,44 +842,60 @@ function renderizarHistoricoBobines() {
 
     const mesesNome = ["", "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
 
-    let html = `<div style="padding:15px; color:white;">`;
+    let html = `
+        <div style="padding:15px; color:white;">
+            <h2 style="border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">📂 Histórico da Bobines</h2>
+    `;
 
-    Object.keys(agrupado).sort((a,b)=>b-a).forEach(ano => {
-        html += `<div style="margin-bottom:10px;">
-                    <div style="background:#1e293b; padding:10px; border-radius:5px; font-weight:bold;">
-                        📂 ${ano}
-                    </div>`;
-
-        Object.keys(agrupado[ano]).sort((a,b)=>b-a).forEach(mes => {
-            html += `
-                <div onclick="toggleMes('${ano}-${mes}')" style="cursor:pointer; padding-left:10px; color:#3b82f6;">
-                    🗓️ ${mesesNome[mes]}
+    Object.keys(agrupado).sort((a, b) => b - a).forEach(ano => {
+        html += `
+            <div style="margin-bottom:10px;">
+                <div onclick="toggleElemento('ano-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border: 1px solid #334155;">
+                    <span>📁 ANO ${ano}</span>
                 </div>
-                <div id="mes-${ano}-${mes}" style="display:none; padding-left:20px;">
+                
+                <div id="ano-${ano}" style="display:none; padding-left:15px; margin-top:5px; border-left: 2px solid #1e293b;">
+        `;
+
+        Object.keys(agrupado[ano]).sort((a, b) => b - a).forEach(mes => {
+            html += `
+                <div onclick="toggleElemento('mes-${ano}-${mes}')" style="cursor:pointer; padding:8px; color:#3b82f6; background: #0f172a; margin-top:3px; border-radius:4px; display:flex; justify-content:space-between;">
+                    <span>📅 ${mesesNome[mes]}</span>
+                    <span>➔</span>
+                </div>
+
+                <div id="mes-${ano}-${mes}" style="display:none; padding-left:15px; background: #1a202c; border-radius: 0 0 5px 5px;">
             `;
 
+            // LISTA DE DIAS/RELATÓRIOS
             agrupado[ano][mes].forEach(rel => {
                 html += `
-                    <div style="margin:5px 0; display:flex; justify-content:space-between;">
-                        <span>📄 ${rel.dia}/${rel.mes} - ${rel.operador}</span>
-                        <button onclick='gerarPDF_Bobines("${encodeURIComponent(JSON.stringify(rel))}")'>PDF</button>
+                    <div style="padding:10px; border-bottom:1px solid #2d3748; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:13px;">📄 Dia ${rel.dia}/${rel.mes} <br> <small style="color:gray;">Op: ${rel.operador}</small></span>
+                        <button onclick='gerarPDF_Bobines("${encodeURIComponent(JSON.stringify(rel))}")' 
+                                style="background:#10b981; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">
+                            Ver PDF
+                        </button>
                     </div>
                 `;
             });
 
-            html += `</div>`;
+            html += `</div>`; // Fecha div do mês
         });
 
-        html += `</div>`;
+        html += `</div></div>`; // Fecha div do ano
     });
 
     html += `</div>`;
     render.innerHTML = html;
 }
 
-function toggleMes(id) {
-    const el = document.getElementById('mes-' + id);
-    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+// Função genérica para abrir/fechar as pastas
+function toggleElemento(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+    }
 }
 function agruparPorRal(itens) {
     let grupos = {};
