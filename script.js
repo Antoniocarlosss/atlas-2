@@ -22,17 +22,6 @@ function fazerLogin() {
 }
 // --- SUAS OUTRAS FUNÇÕES DO SISTEMA (Módulos, Edição, etc) ---
 
-function abrirModulo(modulo) {
-    document.getElementById('grid-home').style.display = 'none';
-    document.getElementById('conteudo-modulo').style.display = 'block';
-    
-    const titulo = document.getElementById('titulo-modulo');
-    const render = document.getElementById('render-modulo');
-    
-    titulo.innerText = "MÓDULO: " + modulo.toUpperCase();
-    render.innerHTML = `<p style="color: white; padding: 20px;">Você acessou o módulo de ${modulo}. Conteúdo em desenvolvimento...</p>`;
-}
-
 function voltarHome() {
     document.getElementById('grid-home').style.display = 'grid';
     document.getElementById('conteudo-modulo').style.display = 'none';
@@ -1370,215 +1359,236 @@ function renderizarMenuSerra() {
     const render = document.getElementById('render-modulo');
     render.innerHTML = `
         <div id="menu-inicial-serra" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; padding:15px;">
-            <div class="card" onclick="exibirSetupSerra()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border: 1px solid #334155;">
+            <div class="card" onclick="exibirSetupSerra()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
                 <i class="fas fa-plus" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
                 <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Novo Relatório</span>
             </div>
-            <div class="card" onclick="listarHistoricoSerra()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border: 1px solid #334155;">
+            <div class="card" onclick="listarHistoricoSerra()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
                 <i class="fas fa-history" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
                 <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Histórico Serra</span>
             </div>
         </div>
-        <div id="aba-conteudo-serra" style="padding:0 15px;"></div>
+        <div id="container-acao-serra" style="display:none; padding:15px;"></div>
     `;
 }
 
-// --- 2. CONFIGURAÇÃO ---
-// --- 2. CONFIGURAÇÃO INICIAL (SETUP) ---
-function exibirSetupSerra() {
+// --- 2. GERENCIAMENTO DE INTERFACE ---
+function alternarAbaSerra(mostrarAcao) {
     const menu = document.getElementById('menu-inicial-serra');
-    if(menu) menu.style.display = 'none';
-    
-    const container = document.getElementById('aba-conteudo-serra');
-    if(!container) return;
+    const acao = document.getElementById('container-acao-serra');
 
-    // Montamos o HTML completo em uma única atribuição para evitar erros
+    if (mostrarAcao) {
+        if (menu) menu.style.display = 'none';
+        if (acao) acao.style.display = 'block';
+    } else {
+        if (menu) menu.style.display = 'grid';
+        if (acao) {
+            acao.style.display = 'none';
+            acao.innerHTML = '';
+        }
+    }
+}
+
+// --- 3. CONFIGURAÇÃO INICIAL ---
+function exibirSetupSerra() {
+    alternarAbaSerra(true);
+
+    const container = document.getElementById('container-acao-serra');
+    if (!container) return;
+
     container.innerHTML = `
-        <div style="display:flex; align-items:center; margin-bottom:15px; padding-top:10px;">
-            <button onclick="renderizarMenuSerra()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; margin-right:15px;">
+        <div style="display:flex; align-items:center; margin-bottom:15px;">
+            <button onclick="alternarAbaSerra(false)" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; margin-right:15px;">
                 <i class="fas fa-arrow-left"></i>
             </button>
             <h3 style="color:#E31C24; font-size:14px; margin:0; text-transform:uppercase;">Configurar Produção</h3>
         </div>
 
-        <div style="margin-bottom: 15px; padding: 10px; background: #1e293b; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #334155;">
-            <label style="color: #94a3b8; font-weight: bold; font-size: 12px;">DATA DO RELATÓRIO:</label>
-            <input type="date" id="data-manual-serra" style="background: #0f172a; color: white; border: 1px solid #3b82f6; padding: 5px; border-radius: 4px; font-weight: bold; outline: none; cursor: pointer;">
+        <div style="margin-bottom:15px; padding:10px; background:#1e293b; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:10px; border:1px solid #334155;">
+            <label style="color:#94a3b8; font-weight:bold; font-size:12px;">DATA DO RELATÓRIO:</label>
+            <input type="date" id="data-manual-serra" style="background:#0f172a; color:white; border:1px solid #3b82f6; padding:5px; border-radius:4px; font-weight:bold; outline:none; cursor:pointer;">
         </div>
 
-        <div style="background:#111827; padding:20px; border-radius:12px; border: 1px solid #334155;">
+        <div style="background:#111827; padding:20px; border-radius:12px; border:1px solid #334155;">
             <label style="color:#94a3b8; font-size:11px;">TIPO DE PAINEL</label>
-            <select id="s-tipo" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:15px; font-weight:bold;">
+            <select id="s-tipo-serra" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:15px; font-weight:bold;">
                 <option value="5 Ondas">5 Ondas</option>
                 <option value="Fachada">Fachada</option>
                 <option value="Telha Canudo">Telha Canudo</option>
             </select>
 
             <label style="color:#94a3b8; font-size:11px;">ESPESSURA (mm)</label>
-            <select id="s-esp" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:20px; font-weight:bold;">
-                ${[30,40,50,60,80,100,120].map(e => `<option value="${e}">${e} mm</option>`).join('')}
+            <select id="s-esp-serra" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:20px; font-weight:bold;">
+                ${[30, 40, 50, 60, 80, 100, 120].map(e => `<option value="${e}">${e} mm</option>`).join('')}
             </select>
 
-            <button onclick="iniciarInterfaceCorte()" style="width:100%; background:white; color:black; font-weight:800; border:none; padding:15px; border-radius:6px; cursor:pointer; text-transform:uppercase;">Abrir Lançamento</button>
+            <button onclick="iniciarInterfaceCorteSerra()" style="width:100%; background:white; color:black; font-weight:800; border:none; padding:15px; border-radius:6px; cursor:pointer; text-transform:uppercase;">
+                Abrir Lançamento
+            </button>
         </div>
     `;
 
-    // Define a data de hoje por padrão
     const inputData = document.getElementById('data-manual-serra');
-    if(inputData) inputData.valueAsDate = new Date();
+    if (inputData) inputData.valueAsDate = new Date();
 }
 
-// --- 3. INTERFACE DE LANÇAMENTO ---
-function iniciarInterfaceCorte() {
-    const tipo = document.getElementById('s-tipo').value;
-    const esp = document.getElementById('s-esp').value;
-    const container = document.getElementById('aba-conteudo-serra');
-    if(!container) return;
+// --- 4. INTERFACE DE LANÇAMENTO ---
+function iniciarInterfaceCorteSerra() {
+    alternarAbaSerra(true);
 
-    // Guardamos a data escolhida no setup para não perder
-    const dataEscolhida = document.getElementById('data-manual-serra').value;
+    const tipo = document.getElementById('s-tipo-serra')?.value || "5 Ondas";
+    const esp = document.getElementById('s-esp-serra')?.value || "30";
+    const dataEscolhida = document.getElementById('data-manual-serra')?.value || "";
+
+    const container = document.getElementById('container-acao-serra');
+    if (!container) return;
 
     container.innerHTML = `
         <div style="background:#1e293b; padding:12px; border-radius:8px; margin-bottom:15px; border-left:4px solid #E31C24; display:flex; justify-content:space-between; align-items:center;">
             <div style="color:white; font-weight:bold; font-size:13px;">${tipo} - ${esp}mm</div>
-            <div id="resumo-soma" style="color:#10b981; font-weight:bold; font-size:14px;">Total: 0.00 m</div>
-            <input type="hidden" id="h-tipo" value="${tipo}">
-            <input type="hidden" id="h-esp" value="${esp}">
-            <input type="hidden" id="h-data-rel" value="${dataEscolhida}">
+            <div id="resumo-soma-serra" style="color:#10b981; font-weight:bold; font-size:14px;">Neste Painel: 0.00m</div>
+            <input type="hidden" id="h-tipo-serra" value="${tipo}">
+            <input type="hidden" id="h-esp-serra" value="${esp}">
+            <input type="hidden" id="h-data-rel-serra" value="${dataEscolhida}">
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
-            <button id="btn-s-ped" onclick="setModoCorte('pedido')" style="background:#3b82f6; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">PEDIDO</button>
-            <button id="btn-s-stk" onclick="setModoCorte('stock')" style="background:#1e293b; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">STOCK</button>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+            <button id="btn-s-ped-serra" onclick="setModoCorteSerra('pedido')" style="background:#3b82f6; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">PEDIDO</button>
+            <button id="btn-s-stk-serra" onclick="setModoCorteSerra('stock')" style="background:#1e293b; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">STOCK</button>
         </div>
 
         <div id="campos-serra" style="background:#111827; padding:15px; border-radius:10px; border:1px solid #334155;"></div>
-        
-        <div id="lista-corte" style="margin-top:15px; max-height: 250px; overflow-y: auto;"></div>
-        
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px;">
+        <div id="lista-corte-serra" style="margin-top:15px; max-height:250px; overflow-y:auto;"></div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px;">
             <button onclick="exibirSetupSerra()" style="background:#3b82f6; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold;">MUDAR PAINEL</button>
             <button onclick="fecharDiaSerra()" style="background:#E31C24; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold;">FECHAR DIA</button>
         </div>
     `;
-    setModoCorte('pedido');
+
+    setModoCorteSerra('pedido');
     atualizarTabelaSerra();
 }
 
-function setModoCorte(modo) {
+function setModoCorteSerra(modo) {
     const container = document.getElementById('campos-serra');
-    if(!container) return;
+    if (!container) return;
 
-    document.getElementById('btn-s-ped').style.background = modo === 'pedido' ? '#3b82f6' : '#1e293b';
-    document.getElementById('btn-s-stk').style.background = modo === 'stock' ? '#3b82f6' : '#1e293b';
+    const btnPed = document.getElementById('btn-s-ped-serra');
+    const btnStk = document.getElementById('btn-s-stk-serra');
+
+    if (btnPed) btnPed.style.background = modo === 'pedido' ? '#3b82f6' : '#1e293b';
+    if (btnStk) btnStk.style.background = modo === 'stock' ? '#3b82f6' : '#1e293b';
 
     const rals = `
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
-            <select id="s-ral-s" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+            <select id="s-ral-s-serra" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
                 <option value="9010">SUP: 9010</option>
                 <option value="9006">SUP: 9006</option>
-                <option value="MAD.NATURAL">SUP: MAD.NATURAL</option>
             </select>
-            <select id="s-ral-i" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            <select id="s-ral-i-serra" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
                 <option value="3009">INF: 3009</option>
-                <option value="9010">INF: 9010</option>
                 <option value="7016">INF: 7016</option>
-                <option value="9006">INF: 9006</option>
             </select>
         </div>
     `;
 
-    if(modo === 'pedido') {
+    if (modo === 'pedido') {
         container.innerHTML = `
-            <input type="text" id="s-ped" placeholder="Nº Pedido" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            <input type="text" id="s-ped-serra" placeholder="Nº Pedido" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
             ${rals}
-            <input type="number" id="s-metros" placeholder="Comprimento (m)" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            <input type="number" id="s-metros-serra" placeholder="Comprimento (m)" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
             <button onclick="addLinhaSerra('pedido')" style="width:100%; background:#E31C24; color:white; border:none; padding:12px; border-radius:5px; font-weight:bold;">ADICIONAR</button>
         `;
     } else {
         container.innerHTML = `
-            <select id="s-qualidade" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
-                <option value="P1">P1</option><option value="P2">P2</option><option value="Descarte">Descarte</option>
+            <select id="s-qualidade-serra" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+                <option value="Descarte">Descarte</option>
             </select>
             ${rals}
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
-                <input type="number" id="s-qtd" placeholder="Qtd" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
-                <input type="number" id="s-metros" placeholder="Metros" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                <input type="number" id="s-qtd-serra" placeholder="Qtd" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <input type="number" id="s-metros-serra" placeholder="Metros" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
             </div>
             <button onclick="addLinhaSerra('stock')" style="width:100%; background:#E31C24; color:white; border:none; padding:12px; border-radius:5px; font-weight:bold;">ADICIONAR STOCK</button>
         `;
     }
 }
 
-// --- 4. LÓGICA E SOMAS ---
+// --- 5. LÓGICA DE DADOS ---
 function addLinhaSerra(modo) {
-    const metrosInput = document.getElementById('s-metros');
+    const metrosInput = document.getElementById('s-metros-serra');
+    if (!metrosInput) return;
+
     const metros = parseFloat(metrosInput.value);
-    if(!metros || metros <= 0) return alert("Insira a metragem!");
+    if (!metros || metros <= 0) return alert("Insira a metragem!");
 
     const item = {
-        tipo: document.getElementById('h-tipo').value,
-        esp: document.getElementById('h-esp').value,
-        ralS: document.getElementById('s-ral-s').value,
-        ralI: document.getElementById('s-ral-i').value,
+        tipo: document.getElementById('h-tipo-serra').value,
+        esp: document.getElementById('h-esp-serra').value,
+        ralS: document.getElementById('s-ral-s-serra').value,
+        ralI: document.getElementById('s-ral-i-serra').value,
         metros: metros,
-        qtd: modo === 'stock' ? (parseInt(document.getElementById('s-qtd').value) || 1) : 1,
-        desc: modo === 'pedido' ? `PED: ${document.getElementById('s-ped').value || "S/N"}` : `STOCK: ${document.getElementById('s-qualidade').value}`
+        qtd: modo === 'stock' ? (parseInt(document.getElementById('s-qtd-serra')?.value) || 1) : 1,
+        desc: modo === 'pedido'
+            ? `PED: ${document.getElementById('s-ped-serra')?.value || "S/N"}`
+            : `STOCK: ${document.getElementById('s-qualidade-serra')?.value || "P1"}`
     };
 
     db_serra_live.push(item);
     localStorage.setItem('atlas_serra_live', JSON.stringify(db_serra_live));
     atualizarTabelaSerra();
-    
+
     metrosInput.value = "";
-    if(document.getElementById('s-ped')) document.getElementById('s-ped').value = "";
+    const ped = document.getElementById('s-ped-serra');
+    if (ped) ped.value = "";
 }
 
 function atualizarTabelaSerra() {
-    const lista = document.getElementById('lista-corte');
-    const totalDisplay = document.getElementById('resumo-soma');
-    if(!lista) return;
+    const lista = document.getElementById('lista-corte-serra');
+    const totalDisplay = document.getElementById('resumo-soma-serra');
+    if (!lista) return;
 
-    const tipoAtual = document.getElementById('h-tipo')?.value;
-    const espAtual = document.getElementById('h-esp')?.value;
+    const tipoAtual = document.getElementById('h-tipo-serra')?.value;
+    const espAtual = document.getElementById('h-esp-serra')?.value;
     let totalDestePainel = 0;
 
     lista.innerHTML = db_serra_live.map((it, idx) => {
-        let metrosLinha = it.metros * it.qtd;
-        if(it.tipo === tipoAtual && it.esp === espAtual) totalDestePainel += metrosLinha;
+        const metrosLinha = it.metros * it.qtd;
+        if (it.tipo === tipoAtual && it.esp === espAtual) totalDestePainel += metrosLinha;
 
         return `
             <div style="background:#1e293b; padding:8px; border-radius:5px; margin-bottom:5px; border-left:4px solid #3b82f6; display:flex; justify-content:space-between; align-items:center; color:white; font-size:11px;">
                 <span>
-                    <b style="color:#10b981;">${metrosLinha.toFixed(2)}m</b> 
-                    <small>(${it.qtd}x ${it.metros}m)</small> — ${it.desc} 
+                    <b style="color:#10b981;">${metrosLinha.toFixed(2)}m</b>
+                    <small>(${it.qtd}x ${it.metros}m)</small> - ${it.desc}
                     <br><small style="color:#94a3b8;">INF: ${it.ralI} / SUP: ${it.ralS}</small>
                 </span>
-                <i class="fas fa-trash" onclick="removerCorte(${idx})" style="color:#ef4444; cursor:pointer; padding:5px;"></i>
+                <i class="fas fa-trash" onclick="removerCorteSerra(${idx})" style="color:#ef4444; cursor:pointer; padding:5px;"></i>
             </div>
         `;
     }).join('');
 
-    if(totalDisplay) totalDisplay.innerText = `Neste Painel: ${totalDestePainel.toFixed(2)}m`;
+    if (totalDisplay) totalDisplay.innerText = `Neste Painel: ${totalDestePainel.toFixed(2)}m`;
 }
 
-function removerCorte(i) {
+function removerCorteSerra(i) {
     db_serra_live.splice(i, 1);
     localStorage.setItem('atlas_serra_live', JSON.stringify(db_serra_live));
     atualizarTabelaSerra();
 }
 
-// --- 5. FECHAR DIA ---
+// --- 6. FECHAR DIA ---
 function fecharDiaSerra() {
     if (db_serra_live.length === 0) return alert("Adicione itens antes de fechar!");
 
-    // Recupera a data do campo oculto (que veio do setup)
-    const seletorData = document.getElementById('h-data-rel').value;
-    
+    const seletorData = document.getElementById('h-data-rel-serra').value;
     let dataFinal, dia, mes, ano;
 
     if (seletorData) {
-        const partes = seletorData.split('-'); 
+        const partes = seletorData.split('-');
         ano = partes[0];
         mes = partes[1];
         dia = partes[2];
@@ -1597,187 +1607,26 @@ function fecharDiaSerra() {
         dia: dia,
         mes: parseInt(mes),
         ano: ano,
-        operador: document.getElementById('user-nome')?.innerText || "OP. SERRA",
+       operador: document.getElementById('user-display')?.innerText || "OP. SERRA",
         itens: [...db_serra_live],
         totalGeral: db_serra_live.reduce((acc, cur) => acc + (cur.metros * cur.qtd), 0).toFixed(2)
     };
 
     db_serra_hist.push(novoRelatorio);
     localStorage.setItem('atlas_serra_hist', JSON.stringify(db_serra_hist));
-    
+
     db_serra_live = [];
     localStorage.removeItem('atlas_serra_live');
-    
+
     alert(`Relatório salvo com sucesso para o dia ${dataFinal}!`);
     renderizarMenuSerra();
 }
 
-// --- 6. FUNÇÃO AUXILIAR DE TOGGLE ---
-function toggleElemento(id) {
-    const el = document.getElementById(id);
-    if(el) {
-        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
-    }
-}
-function gerarPDF_Serra(dadosEncoded) {
-    const rel = JSON.parse(decodeURIComponent(dadosEncoded));
-    const janela = window.open('', '_blank');
-    
-    // 1. Organização dos dados
-    let blocos = {};
-    rel.itens.forEach(it => {
-        let chave = `${it.tipo} ${it.esp}mm`;
-        if(!blocos[chave]) blocos[chave] = { pedidos: [], stock: [] };
-        
-        if(it.desc.toUpperCase().includes('PED:')) {
-            blocos[chave].pedidos.push(it);
-        } else {
-            blocos[chave].stock.push(it);
-        }
-    });
-
-    let htmlConteudo = "";
-
-    for(let nome in blocos) {
-        htmlConteudo += `
-            <div style="margin-bottom:30px;">
-                <div style="background:#000; color:#fff; padding:8px; font-weight:bold; text-align:center; font-size:16px; border:2px solid #000;">
-                    ${nome.toUpperCase()}
-                </div>`;
-
-        // --- LISTA DE PEDIDOS ---
-        if(blocos[nome].pedidos.length > 0) {
-            htmlConteudo += `
-                <div style="text-align: center; padding:5px; background:#ddd; font-weight:bold; font-size:13px; border:2px solid #000; border-top:none; color:#000;"> LISTA DE PEDIDOS</div>
-                <table style="width:100%; border-collapse:collapse; font-size:14px; margin-bottom:10px; color:#000;">
-                    <tr style="background:#eee;">
-                        <th style="border:2px solid #000; width:55px;">Qtd</th>
-                        <th style="border:2px solid #000; width:95px;">Mts Un.</th>
-                        <th style="border:2px solid #000; width:110px;">Total Mts</th>
-                        <th style="border:2px solid #000;">RAL (INF / SUP)</th>
-                        <th style="border:2px solid #000;">Identificação</th>
-                    </tr>
-                    ${blocos[nome].pedidos.map(i => {
-                        let numPedido = i.desc.replace(/PED:\s*/gi, '');
-                        return `
-                        <tr>
-                            <td style="border:2px solid #000; text-align:center;">${i.qtd}</td>
-                            <td style="border:2px solid #000; text-align:center;">${Number(i.metros).toFixed(2)}m</td>
-                            <td style="border:2px solid #000; text-align:center; font-size:15px;">${(i.qtd * i.metros).toFixed(2)}m</td>
-                            <td style="border:2px solid #000; text-align:center;">INF: ${i.ralI} / SUP: ${i.ralS}</td>
-                            <td style="border:2px solid #000; text-align:center; text-transform:uppercase;">PEDIDO: ${numPedido}</td>
-                        </tr>`;
-                    }).join('')}
-                </table>`;
-        }
-
-        // --- PRODUÇÃO PARA STOCK ---
-        if(blocos[nome].stock.length > 0) {
-            htmlConteudo += `
-                <div style="text-align: center; padding:5px; background:#ddd; font-weight:bold; font-size:13px; border:2px solid #000; border-top:none; color:#000;"> PRODUÇÃO PARA STOCK</div>
-                <table style="width:100%; border-collapse:collapse; font-size:14px; margin-bottom:10px; color:#000;">
-                    <tr style="background:#eee;">
-                        <th style="border:2px solid #000; width:55px;">Qtd</th>
-                        <th style="border:2px solid #000; width:95px;">Mts Un.</th>
-                        <th style="border:2px solid #000; width:110px;">Total Mts</th>
-                        <th style="border:2px solid #000;">RAL (INF / SUP)</th>
-                        <th style="border:2px solid #000;">Qualidade</th>
-                    </tr>
-                    ${blocos[nome].stock.map(i => `
-                        <tr>
-                            <td style="border:2px solid #000; text-align:center;">${i.qtd}</td>
-                            <td style="border:2px solid #000; text-align:center;">${Number(i.metros).toFixed(2)}m</td>
-                            <td style="border:2px solid #000; text-align:center; font-size:15px;">${(i.qtd * i.metros).toFixed(2)}m</td>
-                            <td style="border:2px solid #000; text-align:center;">INF: ${i.ralI} / SUP: ${i.ralS}</td>
-                            <td style="border:2px solid #000; text-align:center;">${i.desc}</td>
-                        </tr>
-                    `).join('')}
-                </table>`;
-        }
-        htmlConteudo += `</div>`;
-    }
-
-    janela.document.write(`
-        <html>
-        <head>
-            <title>Relatório de Serra - Atlas</title>
-            <style>
-                @media print { 
-                    .no-print { display: none !important; } 
-                    body { -webkit-print-color-adjust: exact; }
-                }
-                body { font-family: Arial, sans-serif; padding: 20px; color: #000 !important; }
-                table tr td, table tr th { border: 2px solid #000 !important; padding: 8px; color: #000 !important; }
-                /* Negrito Extremo para Leitura Fácil */
-                b, td, th, div, span { font-weight: 900 !important; } 
-            </style>
-        </head>
-        <body>
-            <div style="display:flex; justify-content:space-between; border-bottom:5px solid #E31C24; background:#000; color:#fff; padding:15px; align-items:center;">
-                <div>
-                    <b style="font-size:26px;">ATLAS PAINEL</b><br>
-                    <span style="font-size:14px;">RELATÓRIO DE PRODUÇÃO - SERRA</span>
-                </div>
-                <div style="text-align:right; font-size:14px;">
-                    DATA: ${rel.data}<br>
-                    OPERADOR: ${rel.operador}
-                </div>
-            </div>
-
-            <div style="margin-top:20px;">${htmlConteudo}</div>
-
-            <div style="margin-top:10px; background:#000; color:#fff; padding:15px; text-align:right; font-size:20px; border: 2px solid #000;">
-                TOTAL GERAL PRODUZIDO: ${rel.totalGeral} m
-            </div>
-
-            <div style="margin-top:100px; text-align:center; width:100%;">
-                <div style="display:inline-block; width:350px; border-top:3px solid #000; padding-top:5px;">
-                    <span style="text-transform:uppercase; font-size:16px; color:#000;">${rel.operador}</span><br>
-                    <b style="font-size:12px; color:#000;">Responsável pela Produção</b>
-                </div>
-            </div>
-
-            <div class="no-print" style="text-align: center;">
-                    <button onclick="window.print()" style="padding: 20px; background: #000; color: #fff; border: 3px solid #E31C24; width: 100%; font-size: 18px; font-weight: bold; border-radius: 10px;">
-                        🖨️ CONFIRMAR E GERAR PDF
-                    </button>
-                </div>
-            </div>
-        </body>
-        </html>
-    `);
-    janela.document.close();
-}
-// --- 4. LÓGICA DE DADOS (CORRIGIDA) ---
-function addLinhaSerra(modo) { 
-    const metrosInput = document.getElementById('s-metros');
-    const metros = parseFloat(metrosInput.value);
-    
-    if(!metros || metros <= 0) return alert("Insira uma metragem válida!");
-
-    const item = {
-        tipo: document.getElementById('h-tipo').value,
-        esp: document.getElementById('h-esp').value,
-        ralS: document.getElementById('s-ral-s').value,
-        ralI: document.getElementById('s-ral-i').value,
-        metros: metros,
-        qtd: modo === 'stock' ? (parseInt(document.getElementById('s-qtd').value) || 1) : 1,
-        desc: modo === 'pedido' ? `PED: ${document.getElementById('s-ped').value || "S/N"}` : `STOCK: ${document.getElementById('s-qualidade').value}`
-    };
-
-    db_serra_live.push(item);
-    localStorage.setItem('atlas_serra_live', JSON.stringify(db_serra_live));
-    
-    atualizarTabelaSerra();
-    metrosInput.value = ""; // Limpa o campo após add
-}
-
-// --- 5. HISTÓRICO (ESTILO BOBINES/INJEÇÃO) ---
+// --- 7. HISTÓRICO ---
 function listarHistoricoSerra() {
     const render = document.getElementById('render-modulo');
     let agrupado = {};
 
-    // Organiza por Ano e Mês
     db_serra_hist.forEach(rel => {
         if (!agrupado[rel.ano]) agrupado[rel.ano] = {};
         if (!agrupado[rel.ano][rel.mes]) agrupado[rel.ano][rel.mes] = [];
@@ -1790,7 +1639,7 @@ function listarHistoricoSerra() {
         <div style="padding:15px; color:white;">
             <div style="display:flex; align-items:center; margin-bottom:20px;">
                 <button onclick="renderizarMenuSerra()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button>
-                <h2 style="border-bottom: 2px solid #E31C24; padding-bottom: 10px; margin:0; flex:1; font-size:18px;">📂 HISTÓRICO DA SERRA</h2>
+                <h2 style="border-bottom:2px solid #E31C24; padding-bottom:10px; margin:0; flex:1; font-size:18px;">📂 Histórico da Serra</h2>
             </div>
     `;
 
@@ -1798,39 +1647,38 @@ function listarHistoricoSerra() {
         html += `<div style="text-align:center; padding:50px; color:gray;">Nenhum relatório encontrado no sistema.</div>`;
     }
 
-    Object.keys(agrupado).sort((a,b) => b-a).forEach(ano => {
+    Object.keys(agrupado).sort((a, b) => b - a).forEach(ano => {
         html += `
             <div style="margin-bottom:10px;">
-                <div onclick="toggleElemento('ano-s-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border: 1px solid #334155; display:flex; justify-content:space-between;">
+                <div onclick="toggleElemento('ano-s-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155; display:flex; justify-content:space-between;">
                     <span>📁 ANO ${ano}</span>
                     <i class="fas fa-chevron-down"></i>
                 </div>
-                <div id="ano-s-${ano}" style="display:none; padding-left:10px; margin-top:5px; border-left: 2px solid #E31C24;">`;
-            
-        Object.keys(agrupado[ano]).sort((a,b) => b-a).forEach(mes => {
+                <div id="ano-s-${ano}" style="display:none; padding-left:10px; margin-top:5px; border-left:2px solid #E31C24;">`;
+
+        Object.keys(agrupado[ano]).sort((a, b) => b - a).forEach(mes => {
             html += `
-                <div onclick="toggleElemento('mes-s-${ano}-${mes}')" style="cursor:pointer; padding:10px; color:#3b82f6; background: #0f172a; margin-top:5px; border-radius:4px; font-weight:bold;">
-                    📅 ${mesesNome[mes]}
+                <div onclick="toggleElemento('mes-s-${ano}-${mes}')" style="cursor:pointer; padding:10px; color:#3b82f6; background:#0f172a; margin-top:5px; border-radius:4px; font-weight:bold;">
+                   📅 ${mesesNome[mes]}
                 </div>
-                <div id="mes-s-${ano}-${mes}" style="display:none; padding-left:10px; background: #1a202c;">`;
-                
-            agrupado[ano][mes].forEach((rel, idx) => {
-                // Criamos um ID único para cada relatório para o PDF
-                const relID = `rel-${ano}-${mes}-${idx}`;
+                <div id="mes-s-${ano}-${mes}" style="display:none; padding-left:10px; background:#1a202c;">`;
+
+            agrupado[ano][mes].forEach(rel => {
                 html += `
                     <div style="padding:12px; border-bottom:1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-size:13px;">
                             <b style="color:white;">DIA ${rel.dia}/${rel.mes}</b><br>
                             <small style="color:#94a3b8;">Total: ${rel.totalGeral} m</small>
                         </span>
-                        <button onclick='gerarPDF_Serra("${encodeURIComponent(JSON.stringify(rel))}")' 
-                                style="background:#10b981; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:11px;">
+                        <button onclick='gerarPDF_Serra("${encodeURIComponent(JSON.stringify(rel))}")' style="background:#10b981; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:11px;">
                             <i class="fas fa-file-pdf"></i> VER PDF
                         </button>
                     </div>`;
             });
+
             html += `</div>`;
         });
+
         html += `</div></div>`;
     });
 
@@ -1838,17 +1686,145 @@ function listarHistoricoSerra() {
     render.innerHTML = html;
 }
 
-// --- 6. FUNÇÃO AUXILIAR DE TOGGLE ---
+// --- 8. AUXILIAR ---
 function toggleElemento(id) {
     const el = document.getElementById(id);
-    if(el) {
-        if(el.style.display === 'none' || el.style.display === '') {
-            el.style.display = 'block';
-        } else {
-            el.style.display = 'none';
-        }
+    if (el) {
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
     }
 }
+function gerarPDF_Serra(dadosEncoded) {
+    const rel = JSON.parse(decodeURIComponent(dadosEncoded));
+    const janela = window.open('', '_blank');
+
+    let blocos = {};
+    rel.itens.forEach(it => {
+        let chave = `${it.tipo} ${it.esp}mm`;
+        if (!blocos[chave]) blocos[chave] = { pedidos: [], stock: [] };
+
+        if (it.desc.toUpperCase().includes('PED:')) {
+            blocos[chave].pedidos.push(it);
+        } else {
+            blocos[chave].stock.push(it);
+        }
+    });
+
+    let htmlConteudo = "";
+
+    for (let nome in blocos) {
+        htmlConteudo += `
+            <div style="margin-bottom:30px; page-break-inside: avoid;">
+                <div style="background:#000; color:#fff; padding:8px; font-weight:bold; text-align:center; font-size:16px; border:2px solid #000;">
+                    ${nome.toUpperCase()}
+                </div>`;
+
+        if (blocos[nome].pedidos.length > 0) {
+            htmlConteudo += `
+                <div style="text-align:center; padding:5px; background:#ddd; font-weight:bold; border:2px solid #000; border-top:none; color:#000;">
+                    LISTA DE PEDIDOS
+                </div>
+                <table style="width:100%; border-collapse:collapse; font-size:14px; margin-bottom:10px; color:#000;">
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000; width:50px;">Qtd</th>
+                            <th style="border:2px solid #000; width:90px;">Mts Un.</th>
+                            <th style="border:2px solid #000; width:100px;">Total</th>
+                            <th style="border:2px solid #000;">RAL (INF/SUP)</th>
+                            <th style="border:2px solid #000;">Identificação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${blocos[nome].pedidos.map(i => `
+                            <tr>
+                                <td style="border:2px solid #000; text-align:center;">${i.qtd}</td>
+                                <td style="border:2px solid #000; text-align:center;">${Number(i.metros).toFixed(2)}m</td>
+                                <td style="border:2px solid #000; text-align:center; font-weight:bold;">${(i.qtd * i.metros).toFixed(2)}m</td>
+                                <td style="border:2px solid #000; text-align:center;">${i.ralI}/${i.ralS}</td>
+                                <td style="border:2px solid #000; text-align:center;">${i.desc}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+        }
+
+        if (blocos[nome].stock.length > 0) {
+            htmlConteudo += `
+                <div style="text-align:center; padding:5px; background:#ddd; font-weight:bold; border:2px solid #000; border-top:none; color:#000;">
+                    PRODUÇÃO STOCK
+                </div>
+                <table style="width:100%; border-collapse:collapse; font-size:14px; color:#000;">
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000; width:50px;">Qtd</th>
+                            <th style="border:2px solid #000; width:90px;">Mts Un.</th>
+                            <th style="border:2px solid #000; width:100px;">Total</th>
+                            <th style="border:2px solid #000;">RAL (INF/SUP)</th>
+                            <th style="border:2px solid #000;">Qualidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${blocos[nome].stock.map(i => `
+                            <tr>
+                                <td style="border:2px solid #000; text-align:center;">${i.qtd}</td>
+                                <td style="border:2px solid #000; text-align:center;">${Number(i.metros).toFixed(2)}m</td>
+                                <td style="border:2px solid #000; text-align:center; font-weight:bold;">${(i.qtd * i.metros).toFixed(2)}m</td>
+                                <td style="border:2px solid #000; text-align:center;">${i.ralI}/${i.ralS}</td>
+                                <td style="border:2px solid #000; text-align:center;">${i.desc}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+        }
+
+        htmlConteudo += `</div>`;
+    }
+
+    janela.document.write(`
+        <html>
+        <head>
+            <title>Relatório Serra</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+                table tr td, table tr th { border: 2px solid #000 !important; padding: 8px; }
+                @media print {
+                    .no-print { display: none !important; }
+                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <div style="display:flex; justify-content:space-between; border-bottom:5px solid #E31C24; background:#000; color:#fff; padding:15px; align-items:center;">
+                <div><b style="font-size:22px;">ATLAS PAINEL</b><br>RELATÓRIO DE SERRA</div>
+                <div style="text-align:right; font-weight:bold;">DATA: ${rel.data}<br>OP: ${rel.operador}</div>
+            </div>
+
+            <div style="margin-top:20px;">${htmlConteudo}</div>
+
+            <div style="margin-top:20px; background:#000 !important; color:#fff !important; padding:20px; text-align:right; border:3px solid #000;">
+                <span style="font-size:18px; font-weight:normal; text-transform:uppercase; display:block; margin-bottom:5px;">Total Geral Produzido</span>
+                <b style="font-size:35px; display:block; line-height:1;">${rel.totalGeral} m</b>
+            </div>
+
+            <div style="margin-top:80px; text-align:center; width:100%;">
+                <div style="display:inline-block; width:350px; border-top:2px solid #000; padding-top:5px;">
+                    <b style="text-transform:uppercase; font-size:14px;">${rel.operador}</b><br>
+                    <span>Responsável pela Produção</span>
+                </div>
+            </div>
+
+            <div class="no-print" style="text-align:center;">
+                <button onclick="window.print()" style="padding:20px; background:#000; color:#fff; border:3px solid #E31C24; width:100%; font-size:18px; font-weight:bold; border-radius:10px;">
+                    🖨️ CONFIRMAR E GERAR PDF
+                </button>
+            </div>
+        </body>
+        </html>
+    `);
+
+    janela.document.close();
+}
+
+
 // finalizou a serra aqui 
 
 //embalagem
@@ -2084,7 +2060,7 @@ function fecharDiaEmbalagem() {
         dia: dia,
         mes: parseInt(mes),
         ano: ano,
-        operador: document.getElementById('user-nome')?.innerText || "OP. EMBALAGEM",
+        operador: document.getElementById('user-display')?.innerText || "OP. EMBALAGEM",
         itens: [...db_emb_live],
         totalGeral: db_emb_live.reduce((acc, cur) => acc + (cur.metros * cur.qtd), 0).toFixed(2)
     };
