@@ -1,26 +1,63 @@
-// CONFIGURAÇÃO DE ACESSO (Altere aqui se desejar)
-const CREDENCIAIS_VALIDAS = {
-    usuario: "admin",
-    senha: "123"
-};
+// --- BANCO DE USUARIOS ---
+let usuariosSistema = JSON.parse(localStorage.getItem('atlas_usuarios')) || [
+    { id: "admin", senha: "123", cargo: "admin" }
+];
+
+let usuarioLogado = null;
+
+// Garante que exista um admin padrão
+function inicializarUsuarios() {
+    const existeAdmin = usuariosSistema.some(u => u.id === "admin");
+    if (!existeAdmin) {
+        usuariosSistema.push({ id: "admin", senha: "123", cargo: "admin" });
+        localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
+    }
+}
+
+inicializarUsuarios();
 
 // FUNÇÃO DE LOGIN
 function fazerLogin() {
-    const usuarioInput = document.getElementById('login-email').value;
-    const senhaInput = document.getElementById('login-senha').value;
+    const usuarioInput = document.getElementById('login-email').value.trim();
+    const senhaInput = document.getElementById('login-senha').value.trim();
 
-    if (usuarioInput === "admin" && senhaInput === "123") {
+    const usuarioEncontrado = usuariosSistema.find(
+        u => u.id === usuarioInput && u.senha === senhaInput
+    );
+
+    if (usuarioEncontrado) {
+        usuarioLogado = usuarioEncontrado;
+    if (usuarioEncontrado.bloqueado) {
+    alert("Usuário bloqueado. Fale com o administrador.");
+    return;
+}
+
+
+
         document.getElementById('tela-login').style.display = 'none';
         document.getElementById('app-principal').style.display = 'block';
-        document.getElementById('user-display').innerText = usuarioInput.toUpperCase();
-        
-        // Limpa a lista temporária ao entrar para segurança
-        producoesDoDia = []; 
+        document.getElementById('user-display').innerText = usuarioEncontrado.id.toUpperCase();
+
+        aplicarPermissoesUsuario();
+
+        if (typeof producoesDoDia !== "undefined") {
+            producoesDoDia = [];
+        }
     } else {
         alert("Acesso Negado!");
     }
 }
-// --- SUAS OUTRAS FUNÇÕES DO SISTEMA (Módulos, Edição, etc) ---
+
+function aplicarPermissoesUsuario() {
+    const cardGestao = document.getElementById('card-gestao');
+    if (!cardGestao || !usuarioLogado) return;
+
+    if (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor') {
+        cardGestao.style.display = 'flex';
+    } else {
+        cardGestao.style.display = 'none';
+    }
+}
 
 function voltarHome() {
     document.getElementById('grid-home').style.display = 'grid';
@@ -30,19 +67,25 @@ function voltarHome() {
 function fecharModal() {
     document.getElementById('modal-edicao').style.display = 'none';
 }
+
 function abrirModulo(nome) {
+    if (nome === 'gestao' && (!usuarioLogado || (usuarioLogado.cargo !== 'admin' && usuarioLogado.cargo !== 'supervisor'))) {
+        alert("Apenas ADMIN ou SUPERVISOR podem acessar a Gestão.");
+        return;
+    }
+
     document.getElementById('grid-home').style.display = 'none';
     document.getElementById('conteudo-modulo').style.display = 'block';
-    
-    const titulos = { 
-        injecao: "INJEÇÃO", 
-        bobines: "BOBINES", 
-        serra: "SERRA", 
-        embalagem: "EMBALAGEM", 
-        gestao: "GESTÃO", 
-        config: "AJUSTES" 
+
+    const titulos = {
+        injecao: "INJEÇÃO",
+        bobines: "BOBINES",
+        serra: "SERRA",
+        embalagem: "EMBALAGEM",
+        gestao: "GESTÃO",
+        config: "AJUSTES"
     };
-    
+
     document.getElementById('titulo-modulo').innerText = titulos[nome];
     const render = document.getElementById('render-modulo');
 
@@ -57,10 +100,21 @@ function abrirModulo(nome) {
         renderizarMenuBobines();
     } 
     else if (nome === 'serra') {
-        renderizarMenuSerra(); 
+        renderizarMenuSerra();
     }
     else if (nome === 'embalagem') {
-        renderizarMenuEmbalagem(); // Nova função para Embalagem
+        renderizarMenuEmbalagem();
+    }
+    else if (nome === 'gestao') {
+        renderizarMenuGestao();
+    }
+    else if (nome === 'config') {
+        render.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px; color:#94a3b8; text-align:center; padding:20px;">
+                <i class="fas fa-laptop-code" style="font-size:40px; margin-bottom:15px; color:#3b82f6;"></i>
+                <h3 style="color:white;">MÓDULO EM DESENVOLVIMENTO</h3>
+                <p>Esta funcionalidade estará disponível em breve.</p>
+            </div>`;
     }
     else {
         render.innerHTML = `
@@ -71,6 +125,7 @@ function abrirModulo(nome) {
             </div>`;
     }
 }
+
 
 /* ==========================================================================
    SEÇÃO: INJEÇÃO (ORIGINAL)
@@ -2257,3 +2312,204 @@ function gerarPDF_Embalagem(dadosEncoded) {
     `);
     janela.document.close();
 }
+
+//  Modulo Da Gestao
+function renderizarMenuGestao() {
+    const render = document.getElementById('render-modulo');
+    render.innerHTML = `
+        <div id="menu-gestao" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; padding:15px;">
+            <div class="card" onclick="exibirCriarUsuario()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-user-plus" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Criar ID</span>
+            </div>
+            <div class="card" onclick="listarUsuariosSistema()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-users" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Lista de Usuários</span>
+            </div>
+        </div>
+        <div id="gestao-conteudo" style="padding:15px;"></div>
+    `;
+}
+
+function exibirCriarUsuario() {
+    const container = document.getElementById('gestao-conteudo');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="background:#111827; padding:20px; border-radius:12px; border:1px solid #334155;">
+            <h3 style="color:white; margin-top:0; margin-bottom:15px;">Criar Usuário</h3>
+
+            <input type="text" id="novo-id-usuario" placeholder="ID do funcionário" style="width:100%; margin-bottom:10px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:6px;">
+
+            <input type="password" id="nova-senha-usuario" placeholder="Senha" style="width:100%; margin-bottom:10px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:6px;">
+
+            <select id="novo-cargo-usuario" style="width:100%; margin-bottom:15px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:6px;">
+                <option value="operario">Operário</option>
+                <option value="supervisor">Supervisor</option>
+            </select>
+
+            <button onclick="criarUsuarioSistema()" style="width:100%; background:#10b981; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold;">
+                CRIAR USUÁRIO
+            </button>
+        </div>
+    `;
+}
+
+function criarUsuarioSistema() {
+    const id = document.getElementById('novo-id-usuario')?.value.trim();
+    const senha = document.getElementById('nova-senha-usuario')?.value.trim();
+    const cargo = document.getElementById('novo-cargo-usuario')?.value;
+
+    if (!id || !senha) {
+        alert("Preencha o ID e a senha.");
+        return;
+    }
+
+    const jaExiste = usuariosSistema.some(u => u.id.toLowerCase() === id.toLowerCase());
+    if (jaExiste) {
+        alert("Este ID já existe.");
+        return;
+    }
+
+    usuariosSistema.push({
+        id,
+        senha,
+        cargo
+    });
+
+    localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
+    alert("Usuário criado com sucesso!");
+    exibirCriarUsuario();
+}
+usuariosSistema.push({
+    id,
+    senha,
+    cargo,
+    bloqueado: false
+});
+
+
+function listarUsuariosSistema() {
+    const container = document.getElementById('gestao-conteudo');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            ${usuariosSistema.map((u, index) => `
+                <div style="background:#1e293b; padding:15px; border-radius:10px; border:1px solid #334155;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div>
+                            <div style="color:white; font-weight:bold;">${u.id.toUpperCase()}</div>
+                            <div style="color:#94a3b8; font-size:12px;">Cargo atual: ${u.cargo.toUpperCase()}</div>
+                        </div>
+                        <div style="color:#94a3b8; font-size:12px;">
+    Cargo atual: ${u.cargo.toUpperCase()} | Status: ${u.bloqueado ? 'BLOQUEADO' : 'ATIVO'}
+</div>
+
+                    </div>
+
+                        ${u.cargo === 'admin' ? `
+                            <button disabled style="background:#475569; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">
+                                ADMIN FIXO
+                            </button>
+                        ` : `
+                            <select onchange="alterarCargoUsuario(${index}, this.value)" style="padding:10px; background:#0f172a; color:white; border:1px solid #334155; border-radius:6px; font-weight:bold;">
+                                <option value="operario" ${u.cargo === 'operario' ? 'selected' : ''}>Operário</option>
+                                <option value="supervisor" ${u.cargo === 'supervisor' ? 'selected' : ''}>Supervisor</option>
+                            </select>
+                        `}
+                    </div>
+
+                    <div id="senha-usuario-${index}" style="display:none; color:#f8fafc; background:#0f172a; padding:10px; border-radius:6px; border:1px solid #334155;">
+                        Senha: ${u.senha}
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
+    <button onclick="verSenhaUsuario(${index})" style="background:#3b82f6; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">
+        VER SENHA
+    </button>
+
+    <button onclick="alternarBloqueioUsuario(${index})" style="background:${u.bloqueado ? '#10b981' : '#f59e0b'}; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">
+        ${u.bloqueado ? 'DESBLOQUEAR' : 'BLOQUEAR'}
+    </button>
+
+    <button onclick="excluirUsuario(${index})" style="background:#ef4444; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">
+        EXCLUIR
+    </button>
+</div>
+
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function alterarCargoUsuario(index, novoCargo) {
+    if (!usuariosSistema[index]) return;
+    if (usuariosSistema[index].cargo === 'admin') {
+        alert("O cargo ADMIN não pode ser alterado.");
+        listarUsuariosSistema();
+        return;
+    }
+
+    usuariosSistema[index].cargo = novoCargo;
+    localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
+    alert("Cargo atualizado com sucesso.");
+    listarUsuariosSistema();
+}
+
+function verSenhaUsuario(index) {
+    const senhaConfirmacao = prompt("Digite sua senha para ver a senha deste usuário:");
+    if (!senhaConfirmacao || !usuarioLogado) return;
+
+    if (senhaConfirmacao !== usuarioLogado.senha) {
+        alert("Senha incorreta.");
+        return;
+    }
+
+    const blocoSenha = document.getElementById(`senha-usuario-${index}`);
+    if (blocoSenha) {
+        blocoSenha.style.display = blocoSenha.style.display === 'none' ? 'block' : 'none';
+    }
+}
+function aplicarPermissoesUsuario() {
+    const cardGestao = document.getElementById('card-gestao');
+    if (!cardGestao || !usuarioLogado) return;
+
+    if (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor') {
+        cardGestao.style.display = 'flex';
+    } else {
+        cardGestao.style.display = 'none';
+    }
+}
+function alternarBloqueioUsuario(index) {
+    if (!usuariosSistema[index]) return;
+
+    if (usuariosSistema[index].cargo === 'admin') {
+        alert("O usuário ADMIN não pode ser bloqueado.");
+        return;
+    }
+
+    usuariosSistema[index].bloqueado = !usuariosSistema[index].bloqueado;
+    localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
+
+    alert(usuariosSistema[index].bloqueado ? "Usuário bloqueado." : "Usuário desbloqueado.");
+    listarUsuariosSistema();
+}
+function excluirUsuario(index) {
+    if (!usuariosSistema[index]) return;
+
+    if (usuariosSistema[index].cargo === 'admin') {
+        alert("O usuário ADMIN não pode ser excluído.");
+        return;
+    }
+
+    const confirmar = confirm(`Deseja excluir o usuário ${usuariosSistema[index].id}?`);
+    if (!confirmar) return;
+
+    usuariosSistema.splice(index, 1);
+    localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
+
+    alert("Usuário excluído com sucesso.");
+    listarUsuariosSistema();
+}
+
