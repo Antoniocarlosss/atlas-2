@@ -5,7 +5,6 @@ let usuariosSistema = JSON.parse(localStorage.getItem('atlas_usuarios')) || [
 
 let usuarioLogado = null;
 
-// Garante que exista um admin padrão
 function inicializarUsuarios() {
     const existeAdmin = usuariosSistema.some(u => u.id === "admin");
     if (!existeAdmin) {
@@ -16,7 +15,6 @@ function inicializarUsuarios() {
 
 inicializarUsuarios();
 
-// FUNÇÃO DE LOGIN
 function fazerLogin() {
     const usuarioInput = document.getElementById('login-email').value.trim();
     const senhaInput = document.getElementById('login-senha').value.trim();
@@ -26,14 +24,12 @@ function fazerLogin() {
     );
 
     if (usuarioEncontrado) {
+        if (usuarioEncontrado.bloqueado) {
+            alert("Usuário bloqueado. Fale com o administrador.");
+            return;
+        }
+
         usuarioLogado = usuarioEncontrado;
-    if (usuarioEncontrado.bloqueado) {
-    alert("Usuário bloqueado. Fale com o administrador.");
-    return;
-}
-
-
-
         document.getElementById('tela-login').style.display = 'none';
         document.getElementById('app-principal').style.display = 'block';
         document.getElementById('user-display').innerText = usuarioEncontrado.id.toUpperCase();
@@ -68,6 +64,7 @@ function fecharModal() {
     document.getElementById('modal-edicao').style.display = 'none';
 }
 
+
 function abrirModulo(nome) {
     if (nome === 'gestao' && (!usuarioLogado || (usuarioLogado.cargo !== 'admin' && usuarioLogado.cargo !== 'supervisor'))) {
         alert("Apenas ADMIN ou SUPERVISOR podem acessar a Gestão.");
@@ -82,6 +79,7 @@ function abrirModulo(nome) {
         bobines: "BOBINES",
         serra: "SERRA",
         embalagem: "EMBALAGEM",
+        plano: "PLANO",
         gestao: "GESTÃO",
         config: "AJUSTES"
     };
@@ -104,6 +102,9 @@ function abrirModulo(nome) {
     }
     else if (nome === 'embalagem') {
         renderizarMenuEmbalagem();
+    }
+    else if (nome === 'plano') {
+        renderizarMenuPlanoNovo();
     }
     else if (nome === 'gestao') {
         renderizarMenuGestao();
@@ -2374,20 +2375,14 @@ function criarUsuarioSistema() {
     usuariosSistema.push({
         id,
         senha,
-        cargo
+        cargo,
+        bloqueado: false
     });
 
     localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
     alert("Usuário criado com sucesso!");
     exibirCriarUsuario();
 }
-usuariosSistema.push({
-    id,
-    senha,
-    cargo,
-    bloqueado: false
-});
-
 
 function listarUsuariosSistema() {
     const container = document.getElementById('gestao-conteudo');
@@ -2511,5 +2506,636 @@ function excluirUsuario(index) {
 
     alert("Usuário excluído com sucesso.");
     listarUsuariosSistema();
+}
+ 
+// --- MÓDULO PLANO ---
+// --- MÓDULO PLANO ---
+var db_plano_live = JSON.parse(localStorage.getItem('atlas_plano_live')) || null;
+var db_plano_hist = JSON.parse(localStorage.getItem('atlas_plano_hist')) || [];
+var destinosPlano = JSON.parse(localStorage.getItem('atlas_plano_destinos')) || ["Ansião", "Leiria", "Algarve", "Sobreda", "Abrantes"];
+
+var OPCOES_TIPO_PLANO = ["5 Ondas", "Fachada", "Telha Canudo"];
+var OPCOES_ESPESSURA_PLANO = [30, 40, 50, 60, 80, 100, 120];
+var OPCOES_RAL_SUP = ["9010", "9006", "MAD.NATURAL"];
+var OPCOES_RAL_INF = ["3009", "9010", "7016", "9006"];
+var OPCOES_QUALIDADE = ["P1", "P2", "Descarte"];
+var MESES_PT = ["", "JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+
+function usuarioPodeCriarPlano() {
+    if (!usuarioLogado) return false;
+    return usuarioLogado.cargo !== 'operador' && usuarioLogado.cargo !== 'operario';
+}
+function usuarioPodeVerAnalisePlano() {
+    if (!usuarioLogado) return false;
+    return usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor';
+}
+function salvarPlanoLive() {
+    localStorage.setItem('atlas_plano_live', JSON.stringify(db_plano_live));
+}
+function salvarDestinosPlano() {
+    localStorage.setItem('atlas_plano_destinos', JSON.stringify(destinosPlano));
+}
+function formatarDataPlanoBR(dataISO) {
+    if (!dataISO) return '';
+    const [ano, mes, dia] = dataISO.split('-');
+    return `${dia}/${mes}/${ano}`;
+}
+function togglePlanoElemento(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+}
+function renderizarMenuPlanoNovo() {
+    const render = document.getElementById('render-modulo');
+    if (!render) return;
+    render.innerHTML = `
+        <div id="container-menu-plano" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; padding:15px;">
+            <div class="card" onclick="exibirMenuCriacaoPlano()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; ${usuarioPodeCriarPlano() ? '' : 'opacity:0.55;'}">
+                <i class="fas fa-plus" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Criar Plano</span>
+                <small style="color:#94a3b8;">${usuarioPodeCriarPlano() ? 'Pedidos e stock' : 'Sem permissao para criar'}</small>
+            </div>
+            <div class="card" onclick="listarHistoricoPlano()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-history" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico</span>
+                <small style="color:#94a3b8;">Planos finalizados</small>
+            </div>
+            ${usuarioPodeVerAnalisePlano() ? `
+            <div class="card" onclick="listarAnaliseMensalComprador()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; grid-column:1 / -1;">
+                <i class="fas fa-chart-pie" style="color:#10b981; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico por Comprador</span>
+                <small style="color:#94a3b8;">Resumo mensal da empresa</small>
+            </div>` : ''}
+        </div>
+        <div id="container-acao-plano" style="display:none; padding:15px;"></div>
+    `;
+}
+function alternarAbaPlano(mostrarAcao) {
+    const menu = document.getElementById('container-menu-plano');
+    const acao = document.getElementById('container-acao-plano');
+    if (!menu || !acao) return false;
+    menu.style.display = mostrarAcao ? 'none' : 'grid';
+    acao.style.display = mostrarAcao ? 'block' : 'none';
+    if (!mostrarAcao) acao.innerHTML = '';
+    return true;
+}
+function criarEstruturaPlanoSeNecessario() {
+    if (!db_plano_live) {
+        db_plano_live = {
+            id: Date.now(),
+            dataISO: document.getElementById('plano-data')?.value || new Date().toISOString().slice(0, 10),
+            operador: document.getElementById('user-display')?.innerText || 'SEM USUARIO',
+            linhasAbertas: [],
+            gruposFinalizados: [],
+            modoAtual: 'pedido',
+            pedidoAtual: null
+        };
+        salvarPlanoLive();
+    }
+}
+function exibirMenuCriacaoPlano() {
+    if (!usuarioPodeCriarPlano()) return alert('Sem permissao para criar plano.');
+    if (!alternarAbaPlano(true)) return;
+    const c = document.getElementById('container-acao-plano');
+    const dataAtual = db_plano_live?.dataISO || new Date().toISOString().slice(0, 10);
+    c.innerHTML = `
+        <div style="display:flex; align-items:center; margin-bottom:15px;">
+            <button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button>
+            <h3 style="color:#E31C24; font-size:14px; margin:0; text-transform:uppercase;">Criar Plano</h3>
+        </div>
+        <div style="margin-bottom:15px; padding:10px; background:#1e293b; border-radius:8px; border:1px solid #334155;">
+            <label style="color:#94a3b8; font-size:12px;">DATA DO PLANO</label>
+            <input type="date" id="plano-data" value="${dataAtual}" style="background:#0f172a; color:white; border:1px solid #3b82f6; padding:10px; border-radius:4px; width:100%; margin-top:8px;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+            <div class="card" onclick="abrirFormularioPlano('pedido')" style="cursor:pointer; background:#111827; border-radius:10px; padding:25px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-file-signature" style="color:#10b981; font-size:2.2rem; margin-bottom:12px;"></i><span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Pedidos</span>
+            </div>
+            <div class="card" onclick="abrirFormularioPlano('stock')" style="cursor:pointer; background:#111827; border-radius:10px; padding:25px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-boxes-stacked" style="color:#f59e0b; font-size:2.2rem; margin-bottom:12px;"></i><span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Stock</span>
+            </div>
+        </div>
+        ${db_plano_live ? `<div style="margin-top:15px;"><button onclick="retomarPlanoEmAndamento()" style="width:100%; background:#3b82f6; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold;">RETOMAR PLANO EM ANDAMENTO</button></div>` : ''}
+    `;
+}
+function abrirFormularioPlano(modo) {
+    if (!usuarioPodeCriarPlano()) return alert('Sem permissao para criar plano.');
+    criarEstruturaPlanoSeNecessario();
+    db_plano_live.modoAtual = modo;
+    db_plano_live.dataISO = document.getElementById('plano-data')?.value || db_plano_live.dataISO;
+    salvarPlanoLive();
+    if (!alternarAbaPlano(true)) return;
+    const c = document.getElementById('container-acao-plano');
+    const pedidoAtual = db_plano_live.pedidoAtual;
+    c.innerHTML = `
+        <div style="display:flex; align-items:center; margin-bottom:15px;">
+            <button onclick="exibirMenuCriacaoPlano()" style="background:none; border:none; color:#94a3b8; font-size:18px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button>
+            <h3 style="color:#E31C24; font-size:14px; margin:0; text-transform:uppercase;">${modo === 'pedido' ? 'Plano de Pedidos' : 'Plano de Stock'}</h3>
+        </div>
+        <div style="background:#1e293b; padding:12px; border-radius:8px; margin-bottom:15px; border-left:4px solid ${modo === 'pedido' ? '#10b981' : '#f59e0b'};">
+            <div style="color:white; font-weight:bold; font-size:13px;">Plano em andamento</div>
+            <div style="color:#94a3b8; font-size:12px; margin-top:4px;">Data: ${formatarDataPlanoBR(db_plano_live.dataISO)} | Operador: ${db_plano_live.operador}</div>
+            ${pedidoAtual && modo === 'pedido' ? `<div style="color:#10b981; font-size:12px; margin-top:6px;"><b>Pedido travado:</b> ${pedidoAtual.numero} | ${pedidoAtual.destino}</div>` : ''}
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div><label style="color:#94a3b8; font-size:11px;">TIPO DE CHAPA</label><select id="plano-tipo" onchange="atualizarTelaPlanoAtual()" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-top:5px;">${OPCOES_TIPO_PLANO.map(v=>`<option value="${v}">${v}</option>`).join('')}</select></div>
+            <div><label style="color:#94a3b8; font-size:11px;">ESPESSURA</label><select id="plano-esp" onchange="atualizarTelaPlanoAtual()" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-top:5px;">${OPCOES_ESPESSURA_PLANO.map(v=>`<option value="${v}">${v} mm</option>`).join('')}</select></div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div><label style="color:#94a3b8; font-size:11px;">RAL SUPERIOR</label><select id="plano-ral-sup" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-top:5px;">${OPCOES_RAL_SUP.map(v=>`<option value="${v}">${v}</option>`).join('')}</select></div>
+            <div><label style="color:#94a3b8; font-size:11px;">RAL INFERIOR</label><select id="plano-ral-inf" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-top:5px;">${OPCOES_RAL_INF.map(v=>`<option value="${v}">${v}</option>`).join('')}</select></div>
+        </div>
+        ${modo === 'pedido' ? `
+        <div style="background:#111827; padding:15px; border-radius:10px; border:1px solid #334155;">
+            <input type="text" id="plano-pedido-numero" placeholder="Numero do pedido" value="${pedidoAtual?.numero || ''}" ${pedidoAtual ? 'disabled' : ''} style="width:100%; margin-bottom:10px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            <select id="plano-destino-fixo" ${pedidoAtual ? 'disabled' : ''} onchange="sincronizarDestinoPlano()" style="width:100%; margin-bottom:10px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <option value="">Selecione o comprador fixo</option>
+                ${destinosPlano.map(v=>`<option value="${v}" ${pedidoAtual?.destino===v ? 'selected' : ''}>${v}</option>`).join('')}
+            </select>
+            <input type="text" id="plano-destino-manual" placeholder="Ou digite novo comprador" value="${pedidoAtual && !destinosPlano.includes(pedidoAtual.destino) ? pedidoAtual.destino : ''}" ${pedidoAtual ? 'disabled' : ''} style="width:100%; margin-bottom:10px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <input type="number" id="plano-pedido-qtd" placeholder="Quantidade de chapas" style="padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <input type="number" id="plano-pedido-metros" placeholder="Metros por chapa" style="padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            </div>
+            <button onclick="adicionarLinhaPlano('pedido')" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:5px; font-weight:bold; margin-top:10px;">ADICIONAR PEDIDO</button>
+        </div>` : `
+        <div style="background:#111827; padding:15px; border-radius:10px; border:1px solid #334155;">
+            <input type="date" id="plano-stock-data" value="${db_plano_live.dataISO}" style="width:100%; margin-bottom:10px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            <select id="plano-stock-qualidade" style="width:100%; margin-bottom:10px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">${OPCOES_QUALIDADE.map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <input type="number" id="plano-stock-qtd" placeholder="Quantidade de chapas" style="padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <input type="number" id="plano-stock-metros" placeholder="Metros por chapa" style="padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            </div>
+            <button onclick="adicionarLinhaPlano('stock')" style="width:100%; background:#f59e0b; color:white; border:none; padding:12px; border-radius:5px; font-weight:bold; margin-top:10px;">ADICIONAR STOCK</button>
+        </div>`}
+        <div id="plano-resumo-atual" style="margin-top:15px;"></div>
+        <div id="plano-lista-aberta" style="margin-top:15px;"></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:15px;">
+            <button onclick="finalizarPedidoPlano()" style="background:#3b82f6; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold;">FINALIZAR ${modo === 'pedido' ? 'PEDIDO' : 'STOCK'}</button>
+            <button onclick="finalizarEspessuraPlano()" style="background:#7c3aed; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold;">FINALIZAR ESPESSURA</button>
+            <button onclick="finalizarPlanoCompleto()" style="background:#E31C24; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold;">FINALIZAR PLANO</button>
+        </div>
+        <div id="plano-grupos-finalizados" style="margin-top:15px;"></div>
+    `;
+    atualizarTelaPlanoAtual();
+}
+function sincronizarDestinoPlano() {
+    const fixo = document.getElementById('plano-destino-fixo');
+    const manual = document.getElementById('plano-destino-manual');
+    if (fixo && manual && fixo.value) manual.value = '';
+}
+function adicionarLinhaPlano(modo) {
+    criarEstruturaPlanoSeNecessario();
+    const tipo = document.getElementById('plano-tipo')?.value;
+    const espessura = document.getElementById('plano-esp')?.value;
+    const ralSuperior = document.getElementById('plano-ral-sup')?.value;
+    const ralInferior = document.getElementById('plano-ral-inf')?.value;
+    let item = null;
+    if (modo === 'pedido') {
+        const numero = db_plano_live.pedidoAtual?.numero || document.getElementById('plano-pedido-numero')?.value.trim();
+        const destino = db_plano_live.pedidoAtual?.destino || document.getElementById('plano-destino-manual')?.value.trim() || document.getElementById('plano-destino-fixo')?.value;
+        const quantidade = parseInt(document.getElementById('plano-pedido-qtd')?.value, 10);
+        const metros = parseFloat(document.getElementById('plano-pedido-metros')?.value);
+        if (!numero) return alert('Informe o numero do pedido.');
+        if (!destino) return alert('Informe para onde vai o pedido.');
+        if (!quantidade || quantidade <= 0) return alert('Informe a quantidade de chapas.');
+        if (!metros || metros <= 0) return alert('Informe os metros por chapa.');
+        if (!db_plano_live.pedidoAtual) {
+            db_plano_live.pedidoAtual = { numero, destino };
+            if (!destinosPlano.includes(destino)) {
+                destinosPlano.push(destino);
+                destinosPlano.sort();
+                salvarDestinosPlano();
+            }
+        }
+        item = {
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            modo, tipo, espessura, ralSuperior, ralInferior,
+            quantidadeChapas: quantidade, metrosUnidade: metros,
+            totalMetros: Number((quantidade * metros).toFixed(2)),
+            pedidoNumero: numero, destino: destino,
+            descricao: `PEDIDO ${numero}`
+        };
+    } else {
+        const quantidade = parseInt(document.getElementById('plano-stock-qtd')?.value, 10);
+        const metros = parseFloat(document.getElementById('plano-stock-metros')?.value);
+        const qualidade = document.getElementById('plano-stock-qualidade')?.value || 'P1';
+        if (!quantidade || quantidade <= 0) return alert('Informe a quantidade de chapas.');
+        if (!metros || metros <= 0) return alert('Informe os metros por chapa.');
+        item = {
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            modo, tipo, espessura, ralSuperior, ralInferior,
+            quantidadeChapas: quantidade, metrosUnidade: metros,
+            totalMetros: Number((quantidade * metros).toFixed(2)),
+            qualidade, destino: '', pedidoNumero: '',
+            descricao: `STOCK ${qualidade}`
+        };
+    }
+    db_plano_live.linhasAbertas.push(item);
+    salvarPlanoLive();
+    if (modo === 'pedido') {
+        document.getElementById('plano-pedido-qtd').value = '';
+        document.getElementById('plano-pedido-metros').value = '';
+    } else {
+        document.getElementById('plano-stock-qtd').value = '';
+        document.getElementById('plano-stock-metros').value = '';
+    }
+    atualizarTelaPlanoAtual();
+    if (modo === 'pedido') abrirFormularioPlano('pedido');
+}
+function editarLinhaPlano(idLinha) {
+    const item = db_plano_live?.linhasAbertas.find(x => x.id === idLinha);
+    if (!item) return;
+    const qtd = prompt('Quantidade de chapas:', item.quantidadeChapas);
+    if (qtd === null) return;
+    const mts = prompt('Metros por chapa:', item.metrosUnidade);
+    if (mts === null) return;
+    item.quantidadeChapas = Number(qtd);
+    item.metrosUnidade = Number(mts);
+    item.totalMetros = Number((item.quantidadeChapas * item.metrosUnidade).toFixed(2));
+    salvarPlanoLive();
+    atualizarTelaPlanoAtual();
+}
+function removerLinhaPlano(idLinha) {
+    if (!db_plano_live) return;
+    db_plano_live.linhasAbertas = db_plano_live.linhasAbertas.filter(item => item.id !== idLinha);
+    if (db_plano_live.modoAtual === 'pedido') {
+        const aindaTemPedido = db_plano_live.linhasAbertas.some(x => x.modo === 'pedido' && x.pedidoNumero === db_plano_live.pedidoAtual?.numero);
+        if (!aindaTemPedido) db_plano_live.pedidoAtual = null;
+    }
+    salvarPlanoLive();
+    atualizarTelaPlanoAtual();
+    if (db_plano_live.modoAtual === 'pedido') abrirFormularioPlano('pedido');
+}
+function atualizarTelaPlanoAtual() {
+    if (!db_plano_live) return;
+    const tipoAtual = document.getElementById('plano-tipo')?.value;
+    const espAtual = document.getElementById('plano-esp')?.value;
+    const modoAtual = db_plano_live.modoAtual || 'pedido';
+    const linhasDoBloco = db_plano_live.linhasAbertas.filter(item => item.modo === modoAtual && item.tipo === tipoAtual && String(item.espessura) === String(espAtual));
+    const totalBloco = linhasDoBloco.reduce((a, b) => a + b.totalMetros, 0);
+    const totalPlano = calcularTotalPlano(db_plano_live);
+    document.getElementById('plano-resumo-atual').innerHTML = `<div style="background:#1e293b; padding:12px; border-radius:8px; border:1px solid #334155; color:white; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;"><span><b>Bloco atual:</b> ${tipoAtual} ${espAtual} mm</span><span style="color:#10b981;"><b>Total do bloco:</b> ${totalBloco.toFixed(2)} m</span><span style="color:#3b82f6;"><b>Total do plano:</b> ${totalPlano.toFixed(2)} m</span></div>`;
+    document.getElementById('plano-lista-aberta').innerHTML = linhasDoBloco.length === 0 ? `<div style="background:#111827; color:#94a3b8; padding:15px; border-radius:8px; border:1px dashed #334155;">Nenhuma linha adicionada neste bloco ainda.</div>` : linhasDoBloco.map(item => `
+        <div style="background:#1e293b; padding:10px; border-radius:6px; margin-bottom:8px; border-left:4px solid ${item.modo === 'pedido' ? '#10b981' : '#f59e0b'}; display:flex; justify-content:space-between; gap:12px; align-items:center; color:white; font-size:12px;">
+            <span><b>${item.descricao}${item.destino ? ' | ' + item.destino : ''}</b><br><small>${item.ralInferior}/${item.ralSuperior} | ${item.quantidadeChapas} x ${item.metrosUnidade} m = ${item.totalMetros.toFixed(2)} m</small></span>
+            <span style="display:flex; gap:8px;">
+                <i class="fas fa-pen" onclick="editarLinhaPlano(${item.id})" style="color:#f59e0b; cursor:pointer; padding:5px;"></i>
+                <i class="fas fa-trash" onclick="removerLinhaPlano(${item.id})" style="color:#ef4444; cursor:pointer; padding:5px;"></i>
+            </span>
+        </div>`).join('');
+    document.getElementById('plano-grupos-finalizados').innerHTML = db_plano_live.gruposFinalizados.length === 0 ? '' : `<div style="margin-bottom:8px; color:white; font-weight:bold;">Blocos ja finalizados</div>${db_plano_live.gruposFinalizados.map((g,i)=>`<div style="background:#111827; padding:12px; border-radius:8px; margin-bottom:8px; border:1px solid #334155; color:white;"><div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;"><span><b>${g.tipo}</b> ${g.espessura} mm</span><span>${g.modo.toUpperCase()}</span><span style="color:#10b981;">${g.totalMetros.toFixed(2)} m</span></div><small style="color:#94a3b8;">${g.itens.length} linha(s)</small><button onclick="removerGrupoFinalizadoPlano(${i})" style="margin-top:8px; background:#334155; color:white; border:none; padding:8px 10px; border-radius:6px; cursor:pointer;">REMOVER BLOCO</button></div>`).join('')}`;
+}
+function finalizarPedidoPlano() {
+    if (!db_plano_live) return alert('Nenhum plano em andamento.');
+    if (db_plano_live.modoAtual === 'pedido') {
+        if (!db_plano_live.pedidoAtual) return alert('Nenhum pedido aberto.');
+        const num = db_plano_live.pedidoAtual.numero;
+        const tem = db_plano_live.linhasAbertas.some(x => x.modo === 'pedido' && x.pedidoNumero === num);
+        if (!tem) return alert('Adicione itens antes de finalizar o pedido.');
+        db_plano_live.pedidoAtual = null;
+        salvarPlanoLive();
+        abrirFormularioPlano('pedido');
+        alert('Pedido finalizado. Agora pode abrir outro pedido.');
+        return;
+    }
+    moverBlocoAtualParaFinalizados(false);
+}
+function finalizarEspessuraPlano() {
+    moverBlocoAtualParaFinalizados(true);
+}
+function moverBlocoAtualParaFinalizados(mensagemEspessura) {
+    if (!db_plano_live) return alert('Nenhum plano em andamento.');
+    const tipoAtual = document.getElementById('plano-tipo')?.value;
+    const espAtual = document.getElementById('plano-esp')?.value;
+    const modoAtual = db_plano_live.modoAtual || 'pedido';
+    const linhasDoBloco = db_plano_live.linhasAbertas.filter(item => item.modo === modoAtual && item.tipo === tipoAtual && String(item.espessura) === String(espAtual));
+    if (linhasDoBloco.length === 0) return alert('Nao ha linhas para finalizar neste bloco.');
+    const ids = new Set(linhasDoBloco.map(item => item.id));
+    db_plano_live.linhasAbertas = db_plano_live.linhasAbertas.filter(item => !ids.has(item.id));
+    db_plano_live.gruposFinalizados.push({ id: Date.now(), modo: modoAtual, tipo: tipoAtual, espessura: espAtual, itens: linhasDoBloco, totalMetros: Number(linhasDoBloco.reduce((a,b)=>a+b.totalMetros,0).toFixed(2)), finalizadoEm: new Date().toLocaleString('pt-BR') });
+    salvarPlanoLive();
+    atualizarTelaPlanoAtual();
+    alert(mensagemEspessura ? 'Espessura finalizada.' : 'Bloco finalizado.');
+}
+function removerGrupoFinalizadoPlano(indice) {
+    if (!db_plano_live) return;
+    db_plano_live.gruposFinalizados.splice(indice, 1);
+    salvarPlanoLive();
+    atualizarTelaPlanoAtual();
+}
+function finalizarPlanoCompleto() {
+    if (!db_plano_live) return alert('Nenhum plano em andamento.');
+    if (db_plano_live.linhasAbertas.length > 0 && !confirm('Ainda existem linhas abertas. Deseja finalizar o plano mesmo assim?')) return;
+    const todosOsItens = [...db_plano_live.gruposFinalizados.flatMap(g=>g.itens), ...db_plano_live.linhasAbertas];
+    if (todosOsItens.length === 0) return alert('Adicione algum item antes de finalizar o plano.');
+    const [ano, mes, dia] = db_plano_live.dataISO.split('-');
+    const planoFinal = {
+        id: Date.now(), dataISO: db_plano_live.dataISO, data: `${dia}/${mes}/${ano}`, dia, mes: parseInt(mes,10), ano,
+        operador: db_plano_live.operador, itens: todosOsItens,
+        tiposLancamento: Array.from(new Set(todosOsItens.map(x=>x.modo))),
+        totalGeral: Number(todosOsItens.reduce((a,b)=>a+b.totalMetros,0).toFixed(2)),
+        resumo: gerarResumoPlano(todosOsItens)
+    };
+    db_plano_hist.push(planoFinal);
+    localStorage.setItem('atlas_plano_hist', JSON.stringify(db_plano_hist));
+    db_plano_live = null;
+    localStorage.removeItem('atlas_plano_live');
+    alert('Plano finalizado e enviado para o historico.');
+    renderizarMenuPlanoNovo();
+}
+function gerarResumoPlano(itens) {
+    const porEspessura = {}, porCor = {};
+    itens.forEach(item => {
+        const e = `${item.tipo} ${item.espessura} mm`;
+        const c = `${item.tipo} ${item.espessura} mm|${item.ralInferior}/${item.ralSuperior}`;
+        porEspessura[e] = (porEspessura[e] || 0) + item.totalMetros;
+        porCor[c] = (porCor[c] || 0) + item.totalMetros;
+    });
+    return {
+        porEspessura: Object.entries(porEspessura).map(([nome,total]) => ({ nome, total:Number(total.toFixed(2)) })),
+        porCor: Object.entries(porCor).map(([chave,total]) => { const [painel, cores] = chave.split('|'); return { painel, cores, total:Number(total.toFixed(2)) }; })
+    };
+}
+function calcularTotalPlano(plano) {
+    if (!plano) return 0;
+    return Number((plano.gruposFinalizados.reduce((a,b)=>a+b.totalMetros,0) + plano.linhasAbertas.reduce((a,b)=>a+b.totalMetros,0)).toFixed(2));
+}
+function listarHistoricoPlano() {
+    if (!alternarAbaPlano(true)) return;
+    const c = document.getElementById('container-acao-plano');
+    const agrupado = {};
+    db_plano_hist.forEach(rel => {
+        agrupado[rel.ano] ||= {};
+        agrupado[rel.ano][rel.mes] ||= {};
+        agrupado[rel.ano][rel.mes][rel.dia] ||= [];
+        agrupado[rel.ano][rel.mes][rel.dia].push(rel);
+    });
+    let html = `<div style="color:white;"><div style="display:flex; align-items:center; margin-bottom:20px;"><button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button><h2 style="border-bottom:2px solid #E31C24; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">Historico de Planos</h2></div>`;
+    if (db_plano_hist.length === 0) html += `<div style="text-align:center; padding:50px; color:gray;">Nenhum plano encontrado.</div>`;
+    Object.keys(agrupado).sort((a,b)=>b-a).forEach(ano => {
+        html += `<div style="margin-bottom:10px;"><div onclick="togglePlanoElemento('ano-plano-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155; display:flex; justify-content:space-between;"><span>ANO ${ano}</span><i class="fas fa-chevron-down"></i></div><div id="ano-plano-${ano}" style="display:none; padding-left:10px; margin-top:5px; border-left:2px solid #E31C24;">`;
+        Object.keys(agrupado[ano]).sort((a,b)=>b-a).forEach(mes => {
+            html += `<div onclick="togglePlanoElemento('mes-plano-${ano}-${mes}')" style="cursor:pointer; padding:10px; color:#3b82f6; background:#0f172a; margin-top:5px; border-radius:4px; font-weight:bold;">${MESES_PT[mes]}</div><div id="mes-plano-${ano}-${mes}" style="display:none; padding-left:10px; background:#1a202c;">`;
+            Object.keys(agrupado[ano][mes]).sort((a,b)=>b-a).forEach(dia => {
+                html += `<div onclick="togglePlanoElemento('dia-plano-${ano}-${mes}-${dia}')" style="cursor:pointer; padding:10px; color:white; border-bottom:1px solid #334155;">DIA ${dia}/${String(mes).padStart(2,'0')}</div><div id="dia-plano-${ano}-${mes}-${dia}" style="display:none; padding:8px 0 8px 10px;">`;
+                agrupado[ano][mes][dia].forEach(rel => {
+                    html += `<div style="background:#111827; border:1px solid #334155; border-radius:8px; padding:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:13px;"><b style="color:white;">${rel.data}</b><br><small style="color:#94a3b8;">${Number(rel.totalGeral || 0).toFixed(2)} m</small></span><button onclick='gerarPDF_Plano("${encodeURIComponent(JSON.stringify(rel))}")' style="background:#10b981; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:11px;">PDF</button></div>`;
+                });
+                html += `</div>`;
+            });
+            html += `</div>`;
+        });
+        html += `</div></div>`;
+    });
+    c.innerHTML = html + `</div>`;
+}
+function listarAnaliseMensalComprador() {
+    if (!usuarioPodeVerAnalisePlano()) return alert('Sem permissao.');
+    if (!alternarAbaPlano(true)) return;
+    const c = document.getElementById('container-acao-plano');
+    const meses = {};
+    db_plano_hist.forEach(rel => {
+        const chaveMes = `${rel.ano}-${String(rel.mes).padStart(2,'0')}`;
+        meses[chaveMes] ||= {};
+        rel.itens.filter(i=>i.modo==='pedido' && i.destino).forEach(item => {
+            meses[chaveMes][item.destino] ||= { total:0, tipos:{}, cores:{} };
+            meses[chaveMes][item.destino].total += item.totalMetros;
+            const t = item.tipo;
+            const cor = `${item.ralInferior}/${item.ralSuperior}`;
+            meses[chaveMes][item.destino].tipos[t] ||= 0;
+            meses[chaveMes][item.destino].tipos[t] += item.totalMetros;
+            meses[chaveMes][item.destino].cores[`${t}|${cor}`] ||= 0;
+            meses[chaveMes][item.destino].cores[`${t}|${cor}`] += item.totalMetros;
+        });
+    });
+    let html = `<div style="color:white;"><div style="display:flex; align-items:center; margin-bottom:20px;"><button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button><h2 style="border-bottom:2px solid #10b981; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">Historico por Comprador</h2></div>`;
+    Object.keys(meses).sort().reverse().forEach(chave => {
+        const [ano, mes] = chave.split('-');
+        html += `<div style="margin-bottom:10px;"><div onclick="togglePlanoElemento('analise-${chave}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155;">${MESES_PT[parseInt(mes,10)]} / ${ano}</div><div id="analise-${chave}" style="display:none; margin-top:8px;">`;
+        Object.keys(meses[chave]).sort((a,b)=>meses[chave][b].total-meses[chave][a].total).forEach(dest => {
+            const d = meses[chave][dest];
+            html += `<div style="background:#111827; border:1px solid #334155; border-radius:8px; padding:12px; margin-bottom:10px;"><div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;"><span><b>${dest}</b></span><span style="color:#10b981;"><b>${d.total.toFixed(2)} m</b></span></div><div style="margin-top:8px; color:#94a3b8; font-size:12px;">${Object.entries(d.tipos).map(([t,v])=>`${t}: ${v.toFixed(2)} m`).join(' | ')}</div><div style="margin-top:8px; color:white; font-size:12px;">${Object.entries(d.cores).map(([k,v])=>{ const [tipo, cor] = k.split('|'); return `${tipo} - ${cor}: ${v.toFixed(2)} m`; }).join('<br>')}</div></div>`;
+        });
+        html += `</div></div>`;
+    });
+    c.innerHTML = html + `</div>`;
+}
+function visualizarPlanoDigital(dadosEncoded) {
+    gerarPDF_Plano(dadosEncoded);
+}
+function gerarPDF_Plano(dadosEncoded) {
+    const rel = JSON.parse(decodeURIComponent(dadosEncoded));
+    const janela = window.open('', '_blank');
+    janela.document.write(montarHTMLPlano(rel, true));
+    janela.document.close();
+}
+function montarHTMLPlano(rel, comBotaoImpressao) {
+    const gruposPorPainel = {};
+
+    rel.itens.forEach(item => {
+        const painel = `${item.tipo} ${item.espessura} mm`;
+        if (!gruposPorPainel[painel]) gruposPorPainel[painel] = [];
+
+        gruposPorPainel[painel].push(item);
+    });
+
+    let htmlGrupos = '';
+
+    Object.keys(gruposPorPainel).forEach(nomePainel => {
+        const itensPainel = gruposPorPainel[nomePainel];
+
+        const pedidosAgrupados = {};
+        const stockAgrupado = [];
+
+        itensPainel.forEach(item => {
+            if (item.modo === 'pedido') {
+                const chavePedido = `${item.pedidoNumero}|||${item.destino}`;
+                if (!pedidosAgrupados[chavePedido]) pedidosAgrupados[chavePedido] = [];
+                pedidosAgrupados[chavePedido].push(item);
+            } else {
+                stockAgrupado.push(item);
+            }
+        });
+
+        htmlGrupos += `
+            <div style="margin-bottom:24px; page-break-inside:avoid;">
+                <div style="background:#000; color:#fff; padding:8px; font-weight:bold; text-align:center; font-size:16px; border:2px solid #000;">
+                    ${nomePainel.toUpperCase()}
+                </div>
+        `;
+
+        Object.keys(pedidosAgrupados).forEach(chavePedido => {
+            const itensPedido = pedidosAgrupados[chavePedido];
+
+            itensPedido.sort((a, b) => Number(b.metrosUnidade) - Number(a.metrosUnidade));
+
+            const pedidoNumero = itensPedido[0].pedidoNumero || 'S/N';
+const destino = itensPedido[0].destino || '';
+const totalPedido = itensPedido.reduce((acc, item) => acc + Number(item.totalMetros || 0), 0);
+
+htmlGrupos += `
+    <div style="margin-top:12px; background:#f1f5f9; color:#000; padding:8px; text-align:center; font-weight:bold; border:2px solid #000; border-bottom:none;">
+        PEDIDO ${pedidoNumero}${destino ? ' - ' + destino : ''} - TOTAL ${totalPedido.toFixed(2)} m
+    </div>
+
+                <table style="width:100%; border-collapse:collapse; font-size:13px; color:#000; margin-bottom:12px;">
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000;">RAL</th>
+                            <th style="border:2px solid #000;">Qtd</th>
+                            <th style="border:2px solid #000;">Mts Un.</th>
+                            <th style="border:2px solid #000;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itensPedido.map(item => `
+    <tr>
+        <td style="border:2px solid #000; text-align:center;">${item.ralInferior}/${item.ralSuperior}</td>
+        <td style="border:2px solid #000; text-align:center;">${item.quantidadeChapas} un.</td>
+        <td style="border:2px solid #000; text-align:center; font-weight:bold;">${formatarMedidaRelatorio(item.metrosUnidade)}un</td>
+        <td style="border:2px solid #000; text-align:center; font-weight:bold;">${formatarTotalRelatorio(item.totalMetros)}</td>
+  </tr>
+`).join('')}
+
+                    </tbody>
+                </table>
+            `;
+        });
+
+        if (stockAgrupado.length > 0) {
+            stockAgrupado.sort((a, b) => Number(b.metrosUnidade) - Number(a.metrosUnidade));
+
+            htmlGrupos += `
+                <div style="margin-top:12px; background:#f1f5f9; color:#000; padding:8px; text-align:center; font-weight:bold; border:2px solid #000; border-bottom:none;">
+                    STOCK
+                </div>
+                <table style="width:100%; border-collapse:collapse; font-size:13px; color:#000;">
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000;">Qualidade</th>
+                            <th style="border:2px solid #000;">RAL</th>
+                            <th style="border:2px solid #000;">Qtd</th>
+                            <th style="border:2px solid #000;">Mts Un.</th>
+                            <th style="border:2px solid #000;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${stockAgrupado.map(item => `
+                            <tr>
+                                <td style="border:2px solid #000; text-align:center;">${item.qualidade || '-'}</td>
+                                <td style="border:2px solid #000; text-align:center;">${item.ralInferior}/${item.ralSuperior}</td>
+                                <td style="border:2px solid #000; text-align:center;">${item.quantidadeChapas} un.</td>
+                                <td style="border:2px solid #000; text-align:center; font-weight:bold;">${formatarMedidaRelatorio(item.metrosUnidade)}</td>
+                               <td style="border:2px solid #000; text-align:center; font-weight:bold;">${formatarTotalRelatorio(item.totalMetros)}</td>
+
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        htmlGrupos += `</div>`;
+    });
+
+    const resumoCores = (rel.resumo?.porCor || []).map(item => `
+        <tr>
+            <td style="border:2px solid #000; text-align:center;">${item.painel}</td>
+            <td style="border:2px solid #000; text-align:center;">${item.cores}</td>
+            <td style="border:2px solid #000; text-align:center; font-weight:bold;">${item.total.toFixed(2)} m</td>
+        </tr>
+    `).join('');
+
+    const resumoEsp = (rel.resumo?.porEspessura || []).map(item => `
+        <tr>
+            <td style="border:2px solid #000; text-align:center;">${item.nome}</td>
+            <td style="border:2px solid #000; text-align:center; font-weight:bold;">${item.total.toFixed(2)} m</td>
+        </tr>
+    `).join('');
+
+    return `
+        <html>
+        <head>
+            <title>Plano de Relatorio</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+                table { width: 100%; border-collapse: collapse; }
+                table tr td, table tr th { padding: 8px; }
+                @media print {
+                    .no-print { display: none !important; }
+                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <div style="display:flex; justify-content:space-between; border-bottom:5px solid #E31C24; background:#000; color:#fff; padding:15px; align-items:center;">
+                <div><b style="font-size:22px;">ATLAS PAINEL</b><br>PLANO DE RELATORIO</div>
+                <div style="text-align:right; font-weight:bold;">DATA: ${rel.data}<br>OP: ${rel.operador}</div>
+            </div>
+
+            <div style="margin-top:20px;">${htmlGrupos}</div>
+
+            <div style="margin-top:30px;">
+                <div style="background:#000; color:#fff; padding:8px; font-weight:bold; text-align:center; font-size:16px; border:2px solid #000;">RESUMO POR COR</div>
+                <table style="font-size:13px; color:#000;">
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000;">Painel</th>
+                            <th style="border:2px solid #000;">RAL INF / SUP</th>
+                            <th style="border:2px solid #000;">Metros</th>
+                        </tr>
+                    </thead>
+                    <tbody>${resumoCores}</tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:30px;">
+                <div style="background:#000; color:#fff; padding:8px; font-weight:bold; text-align:center; font-size:16px; border:2px solid #000;">TOTAIS DO PLANO</div>
+                <table style="font-size:13px; color:#000;">
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000;">Grupo</th>
+                            <th style="border:2px solid #000;">Metros Totais</th>
+                        </tr>
+                    </thead>
+                    <tbody>${resumoEsp}</tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:20px; background:#000; color:#fff; padding:20px; text-align:right; border:3px solid #000;">
+                <span style="font-size:18px; font-weight:normal; text-transform:uppercase; display:block; margin-bottom:5px;">Total Geral do Plano</span>
+                <b style="font-size:35px; display:block; line-height:1;">${Number(rel.totalGeral).toFixed(2)} m</b>
+            </div>
+
+            ${comBotaoImpressao ? `
+                <div class="no-print" style="text-align:center; margin-top:20px;">
+                    <button onclick="window.print()" style="padding:20px; background:#000; color:#fff; border:3px solid #E31C24; width:100%; font-size:18px; font-weight:bold; border-radius:10px;">
+                        CONFIRMAR E GERAR PDF
+                    </button>
+                </div>
+            ` : ''}
+        </body>
+        </html>
+    `;
+}
+function formatarMedidaRelatorio(metros) {
+    const valor = Number(metros || 0);
+    const mm = Math.round(valor * 1000);
+
+    let metrosTexto = valor.toFixed(2).replace('.', ',');
+    metrosTexto = metrosTexto.replace(/,00$/, '');
+    metrosTexto = metrosTexto.replace(/(\,\d*[1-9])0$/, '$1');
+
+    return `${mm} (${metrosTexto} metros)`;
+}
+function formatarTotalRelatorio(metros) {
+    const valor = Number(metros || 0);
+    const mm = Math.round(valor * 1000);
+
+    let metrosTexto = valor.toFixed(2).replace('.', ',');
+    metrosTexto = metrosTexto.replace(/,00$/, '');
+    metrosTexto = metrosTexto.replace(/(\,\d*[1-9])0$/, '$1');
+
+    return `${mm} (${metrosTexto} metros)`;
 }
 
