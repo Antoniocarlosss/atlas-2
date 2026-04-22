@@ -2870,12 +2870,12 @@ function listarHistoricoPlano() {
         agrupado[rel.ano][rel.mes][rel.dia] ||= [];
         agrupado[rel.ano][rel.mes][rel.dia].push(rel);
     });
-    let html = `<div style="color:white;"><div style="display:flex; align-items:center; margin-bottom:20px;"><button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button><h2 style="border-bottom:2px solid #E31C24; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">Historico de Planos</h2></div>`;
+    let html = `<div style="color:white;"><div style="display:flex; align-items:center; margin-bottom:20px;"><button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button><h2 style="border-bottom:2px solid #E31C24; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">📂 Historico de Planos</h2></div>`;
     if (db_plano_hist.length === 0) html += `<div style="text-align:center; padding:50px; color:gray;">Nenhum plano encontrado.</div>`;
     Object.keys(agrupado).sort((a,b)=>b-a).forEach(ano => {
-        html += `<div style="margin-bottom:10px;"><div onclick="togglePlanoElemento('ano-plano-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155; display:flex; justify-content:space-between;"><span>ANO ${ano}</span><i class="fas fa-chevron-down"></i></div><div id="ano-plano-${ano}" style="display:none; padding-left:10px; margin-top:5px; border-left:2px solid #E31C24;">`;
+        html += `<div style="margin-bottom:10px;"><div onclick="togglePlanoElemento('ano-plano-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155; display:flex; justify-content:space-between;"><span>📁 ANO ${ano}</span><i class="fas fa-chevron-down"></i></div><div id="ano-plano-${ano}" style="display:none; padding-left:10px; margin-top:5px; border-left:2px solid #E31C24;">`;
         Object.keys(agrupado[ano]).sort((a,b)=>b-a).forEach(mes => {
-            html += `<div onclick="togglePlanoElemento('mes-plano-${ano}-${mes}')" style="cursor:pointer; padding:10px; color:#3b82f6; background:#0f172a; margin-top:5px; border-radius:4px; font-weight:bold;">${MESES_PT[mes]}</div><div id="mes-plano-${ano}-${mes}" style="display:none; padding-left:10px; background:#1a202c;">`;
+            html += `<div onclick="togglePlanoElemento('mes-plano-${ano}-${mes}')" style="cursor:pointer; padding:10px; color:#3b82f6; background:#0f172a; margin-top:5px; border-radius:4px; font-weight:bold;"> 📅${MESES_PT[mes]}</div><div id="mes-plano-${ano}-${mes}" style="display:none; padding-left:10px; background:#1a202c;">`;
             Object.keys(agrupado[ano][mes]).sort((a,b)=>b-a).forEach(dia => {
                 html += `<div onclick="togglePlanoElemento('dia-plano-${ano}-${mes}-${dia}')" style="cursor:pointer; padding:10px; color:white; border-bottom:1px solid #334155;">DIA ${dia}/${String(mes).padStart(2,'0')}</div><div id="dia-plano-${ano}-${mes}-${dia}" style="display:none; padding:8px 0 8px 10px;">`;
                 agrupado[ano][mes][dia].forEach(rel => {
@@ -3138,4 +3138,5 @@ function formatarTotalRelatorio(metros) {
 
     return `${mm} (${metrosTexto} metros)`;
 }
+
 
