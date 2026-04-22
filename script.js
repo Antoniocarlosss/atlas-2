@@ -2471,11 +2471,12 @@ function aplicarPermissoesUsuario() {
     if (!cardGestao || !usuarioLogado) return;
 
     if (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor') {
-        cardGestao.style.display = 'flex';
+        cardGestao.style.display = '';
     } else {
         cardGestao.style.display = 'none';
     }
 }
+
 function alternarBloqueioUsuario(index) {
     if (!usuariosSistema[index]) return;
 
