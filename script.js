@@ -4,6 +4,82 @@ let usuariosSistema = JSON.parse(localStorage.getItem('atlas_usuarios')) || [
 ];
 
 let usuarioLogado = null;
+const MODULOS_SISTEMA = [
+    { chave: 'injecao', nome: 'Injeção' },
+    { chave: 'bobines', nome: 'Bobines' },
+    { chave: 'serra', nome: 'Serra' },
+    { chave: 'embalagem', nome: 'Embalagem' },
+    { chave: 'plano', nome: 'Plano' },
+    { chave: 'gestao', nome: 'Gestão' },
+    { chave: 'config', nome: 'Ajustes' }
+];
+
+function obterChavePreferenciasUsuario(idUsuario) {
+    return `atlas_pref_${String(idUsuario || '').toLowerCase()}`;
+}
+
+function obterPreferenciasPadraoUsuario() {
+    return {
+        tema: 'escuro',
+        modulosVisiveis: ['injecao', 'bobines', 'serra', 'embalagem', 'plano', 'config']
+    };
+}
+
+function obterPreferenciasUsuario(idUsuario) {
+    const chave = obterChavePreferenciasUsuario(idUsuario);
+    const salvas = JSON.parse(localStorage.getItem(chave));
+
+    if (!salvas) {
+        return obterPreferenciasPadraoUsuario();
+    }
+
+    return {
+        tema: salvas.tema || 'escuro',
+        modulosVisiveis: Array.isArray(salvas.modulosVisiveis) ? salvas.modulosVisiveis : obterPreferenciasPadraoUsuario().modulosVisiveis
+    };
+}
+
+function salvarPreferenciasUsuario(idUsuario, preferencias) {
+    const chave = obterChavePreferenciasUsuario(idUsuario);
+    localStorage.setItem(chave, JSON.stringify(preferencias));
+}
+
+function aplicarTemaUsuario(tema) {
+    document.body.classList.toggle('tema-claro', tema === 'claro');
+}
+
+function aplicarPreferenciasVisuaisUsuario() {
+    if (!usuarioLogado) return;
+
+    const preferencias = obterPreferenciasUsuario(usuarioLogado.id);
+    aplicarTemaUsuario(preferencias.tema);
+
+    const gridHome = document.getElementById('grid-home');
+    if (!gridHome) return;
+
+    const cards = gridHome.querySelectorAll('.card');
+    cards.forEach(card => {
+        const onclick = card.getAttribute('onclick') || '';
+        const match = onclick.match(/abrirModulo\('([^']+)'\)/);
+        if (!match) return;
+
+        const nomeModulo = match[1];
+
+        if (nomeModulo === 'config') {
+            card.style.display = '';
+            return;
+        }
+
+        if (nomeModulo === 'gestao') {
+            const podeVerGestao = usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor';
+            const estaSelecionado = preferencias.modulosVisiveis.includes('gestao');
+            card.style.display = podeVerGestao && estaSelecionado ? '' : 'none';
+            return;
+        }
+
+        card.style.display = preferencias.modulosVisiveis.includes(nomeModulo) ? '' : 'none';
+    });
+}
 
 function inicializarUsuarios() {
     const existeAdmin = usuariosSistema.some(u => u.id === "admin");
@@ -34,9 +110,11 @@ function fazerLogin() {
         document.getElementById('app-principal').style.display = 'block';
         document.getElementById('user-display').innerText = usuarioEncontrado.id.toUpperCase();
 
-        aplicarPermissoesUsuario();
+       aplicarPermissoesUsuario();
+aplicarPreferenciasVisuaisUsuario();
 
-        if (typeof producoesDoDia !== "undefined") {
+if (typeof producoesDoDia !== "undefined") {
+
             producoesDoDia = [];
         }
     } else {
@@ -47,6 +125,8 @@ function fazerLogin() {
 function voltarHome() {
     document.getElementById('grid-home').style.display = 'grid';
     document.getElementById('conteudo-modulo').style.display = 'none';
+    aplicarPermissoesUsuario();
+    aplicarPreferenciasVisuaisUsuario();
 }
 
 function fecharModal() {
@@ -98,22 +178,10 @@ function abrirModulo(nome) {
     else if (nome === 'gestao') {
         renderizarMenuGestao();
     }
-    else if (nome === 'config') {
-        render.innerHTML = `
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px; color:#94a3b8; text-align:center; padding:20px;">
-                <i class="fas fa-laptop-code" style="font-size:40px; margin-bottom:15px; color:#3b82f6;"></i>
-                <h3 style="color:white;">MÓDULO EM DESENVOLVIMENTO</h3>
-                <p>Esta funcionalidade estará disponível em breve.</p>
-            </div>`;
-    }
-    else {
-        render.innerHTML = `
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px; color:#94a3b8; text-align:center; padding:20px;">
-                <i class="fas fa-laptop-code" style="font-size:40px; margin-bottom:15px; color:#3b82f6;"></i>
-                <h3 style="color:white;">MÓDULO EM DESENVOLVIMENTO</h3>
-                <p>Esta funcionalidade estará disponível em breve.</p>
-            </div>`;
-    }
+   else if (nome === 'config') {
+    renderizarMenuAjustes();
+}
+
 }
 
 
@@ -3474,5 +3542,287 @@ function formatarTotalRelatorio(metros) {
     metrosTexto = metrosTexto.replace(/(\,\d*[1-9])0$/, '$1');
 
     return `${mm} (${metrosTexto} metros)`;
+}
+// final do modulo plano 
+
+// incio dos ajustes
+function renderizarMenuAjustes() {
+    const render = document.getElementById('render-modulo');
+    if (!render || !usuarioLogado) return;
+
+    render.innerHTML = `
+        <div id="menu-ajustes" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; padding:15px;">
+            <div class="card" onclick="abrirAjustesUsuario()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-user-cog" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Usuário</span>
+                <small style="color:#94a3b8;">Senha, tema e módulos</small>
+            </div>
+
+            <div class="card" onclick="abrirAjustesBackup()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-database" style="color:#10b981; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Backup</span>
+                <small style="color:#94a3b8;">Exportar e importar dados</small>
+            </div>
+
+            <div class="card" onclick="abrirAjustesSistema()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; grid-column:1 / -1;">
+                <i class="fas fa-sliders-h" style="color:#f59e0b; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Sistema</span>
+                <small style="color:#94a3b8;">Ferramentas e ajustes gerais</small>
+            </div>
+        </div>
+
+        <div id="conteudo-ajustes" style="display:none; padding:15px;"></div>
+    `;
+}
+
+function alternarAbaAjustes(mostrarConteudo) {
+    const menu = document.getElementById('menu-ajustes');
+    const conteudo = document.getElementById('conteudo-ajustes');
+    if (!menu || !conteudo) return false;
+
+    menu.style.display = mostrarConteudo ? 'none' : 'grid';
+    conteudo.style.display = mostrarConteudo ? 'block' : 'none';
+
+    if (!mostrarConteudo) conteudo.innerHTML = '';
+    return true;
+}
+
+function abrirAjustesUsuario() {
+    if (!usuarioLogado) return;
+    if (!alternarAbaAjustes(true)) return;
+
+    const preferencias = obterPreferenciasUsuario(usuarioLogado.id);
+    const podeGerirGestao = usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor';
+    const c = document.getElementById('conteudo-ajustes');
+    if (!c) return;
+
+    const modulosMarcados = preferencias.modulosVisiveis;
+
+    c.innerHTML = `
+        <div style="display:flex; align-items:center; margin-bottom:20px;">
+            <button onclick="alternarAbaAjustes(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 style="border-bottom:2px solid #3b82f6; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">
+                Ajustes do Usuário
+            </h2>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:15px; max-width:900px; margin:0 auto;">
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+                <h3 style="margin-top:0; margin-bottom:15px;">Conta</h3>
+                <div style="font-size:13px; color:#94a3b8; margin-bottom:15px;">
+                    ID: <b style="color:white;">${usuarioLogado.id.toUpperCase()}</b><br>
+                    Cargo: <b style="color:white;">${usuarioLogado.cargo.toUpperCase()}</b>
+                </div>
+
+                <input type="password" id="senha-atual-ajustes" placeholder="Senha atual" style="width:100%; margin-bottom:10px; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <input type="password" id="nova-senha-ajustes" placeholder="Nova senha" style="width:100%; margin-bottom:10px; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <input type="password" id="confirmar-senha-ajustes" placeholder="Confirmar nova senha" style="width:100%; margin-bottom:10px; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+
+                <button onclick="alterarMinhaSenha()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">
+                    ALTERAR SENHA
+                </button>
+            </div>
+
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+                <h3 style="margin-top:0; margin-bottom:15px;">Aparência</h3>
+
+                <select id="seletor-tema-ajustes" style="width:100%; margin-bottom:12px; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                    <option value="escuro" ${preferencias.tema === 'escuro' ? 'selected' : ''}>Modo escuro</option>
+                    <option value="claro" ${preferencias.tema === 'claro' ? 'selected' : ''}>Modo claro</option>
+                </select>
+
+                <button onclick="salvarTemaUsuario()" style="width:100%; background:#3b82f6; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">
+                    CONFIRMAR TEMA
+                </button>
+            </div>
+
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+                <h3 style="margin-top:0; margin-bottom:15px;">Meus módulos</h3>
+
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+                    ${MODULOS_SISTEMA
+                        .filter(mod => mod.chave !== 'config')
+                        .filter(mod => mod.chave !== 'gestao' || podeGerirGestao)
+                        .map(mod => `
+                            <label style="display:flex; align-items:center; gap:10px; background:#0f172a; padding:12px; border-radius:8px; border:1px solid #334155; cursor:pointer;">
+                                <input class="check-modulo-ajustes" type="checkbox" value="${mod.chave}" ${modulosMarcados.includes(mod.chave) ? 'checked' : ''} style="width:auto;">
+                                <span>${mod.nome}</span>
+                            </label>
+                        `).join('')}
+                </div>
+
+                <button onclick="salvarModulosVisiveis()" style="width:100%; background:#3b82f6; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">
+                    CONFIRMAR MÓDULOS
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function abrirAjustesBackup() {
+    if (!alternarAbaAjustes(true)) return;
+
+    const c = document.getElementById('conteudo-ajustes');
+    if (!c) return;
+
+    c.innerHTML = `
+        <div style="display:flex; align-items:center; margin-bottom:20px;">
+            <button onclick="alternarAbaAjustes(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 style="border-bottom:2px solid #10b981; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">
+                Backup do Sistema
+            </h2>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+                <h3 style="margin-top:0; margin-bottom:10px;">Exportar</h3>
+                <p style="color:#94a3b8; font-size:13px; margin-bottom:15px;">Baixa um arquivo com todos os dados salvos no navegador.</p>
+                <button onclick="exportarBackupSistema()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">
+                    EXPORTAR BACKUP
+                </button>
+            </div>
+
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+                <h3 style="margin-top:0; margin-bottom:10px;">Importar</h3>
+                <p style="color:#94a3b8; font-size:13px; margin-bottom:15px;">Restaura um backup salvo anteriormente.</p>
+                <input type="file" id="arquivo-backup" accept=".json" style="width:100%; margin-bottom:10px; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <button onclick="importarBackupSistema()" style="width:100%; background:#3b82f6; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">
+                    IMPORTAR BACKUP
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function abrirAjustesSistema() {
+    if (!alternarAbaAjustes(true)) return;
+
+    const c = document.getElementById('conteudo-ajustes');
+    if (!c) return;
+
+    c.innerHTML = `
+        <div style="display:flex; align-items:center; margin-bottom:20px;">
+            <button onclick="alternarAbaAjustes(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h2 style="border-bottom:2px solid #f59e0b; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">
+                Ajustes do Sistema
+            </h2>
+        </div>
+
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+            <h3 style="margin-top:0; margin-bottom:10px;">Em desenvolvimento</h3>
+            <p style="color:#94a3b8; font-size:13px;">
+                Aqui depois podemos colocar:
+                destinos do plano, limpar históricos, RAL, tipos de painel, espessuras e outras ferramentas do sistema.
+            </p>
+        </div>
+    `;
+}
+
+function exportarBackupSistema() {
+    const backup = {};
+
+    for (let i = 0; i < localStorage.length; i++) {
+        const chave = localStorage.key(i);
+        backup[chave] = localStorage.getItem(chave);
+    }
+
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `atlas-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+
+    URL.revokeObjectURL(url);
+}
+
+function importarBackupSistema() {
+    const input = document.getElementById('arquivo-backup');
+    const arquivo = input?.files?.[0];
+
+    if (!arquivo) {
+        alert('Selecione um arquivo de backup.');
+        return;
+    }
+
+    const leitor = new FileReader();
+    leitor.onload = function(e) {
+        try {
+            const dados = JSON.parse(e.target.result);
+
+            Object.keys(dados).forEach(chave => {
+                localStorage.setItem(chave, dados[chave]);
+            });
+
+            alert('Backup importado com sucesso. A página será recarregada.');
+            location.reload();
+        } catch (erro) {
+            alert('Arquivo de backup inválido.');
+        }
+    };
+
+    leitor.readAsText(arquivo);
+}
+function salvarTemaUsuario() {
+    if (!usuarioLogado) return;
+
+    const seletor = document.getElementById('seletor-tema-ajustes');
+    const tema = seletor?.value || 'escuro';
+
+    const preferencias = obterPreferenciasUsuario(usuarioLogado.id);
+    preferencias.tema = tema;
+
+    salvarPreferenciasUsuario(usuarioLogado.id, preferencias);
+    aplicarTemaUsuario(tema);
+
+    alert('Tema atualizado com sucesso.');
+}
+
+function salvarModulosVisiveis() {
+    if (!usuarioLogado) return;
+
+    const checks = document.querySelectorAll('.check-modulo-ajustes:checked');
+    const modulosSelecionados = Array.from(checks).map(el => el.value);
+
+    if (modulosSelecionados.length === 0) {
+        alert('Selecione pelo menos um módulo.');
+        return;
+    }
+
+    const preferencias = obterPreferenciasUsuario(usuarioLogado.id);
+    preferencias.modulosVisiveis = modulosSelecionados;
+
+    salvarPreferenciasUsuario(usuarioLogado.id, preferencias);
+    aplicarPermissoesUsuario();
+    aplicarPreferenciasVisuaisUsuario();
+
+    alert('Módulos atualizados com sucesso.');
+}
+function aplicarTemaUsuario(tema) {
+    document.body.classList.toggle('tema-claro', tema === 'claro');
+
+    const header = document.querySelector('header');
+    if (header) {
+        header.style.background = tema === 'claro' ? '#ffffff' : '';
+        header.style.color = tema === 'claro' ? '#0f172a' : '';
+    }
+
+    const app = document.getElementById('app-principal');
+    if (app) {
+        app.style.background = tema === 'claro' ? '#f3f6fb' : '';
+        app.style.color = tema === 'claro' ? '#0f172a' : '';
+    }
+
+    const grid = document.getElementById('grid-home');
+    if (grid) {
+        grid.style.background = tema === 'claro' ? '#f3f6fb' : '';
+    }
 }
 
