@@ -44,17 +44,6 @@ function fazerLogin() {
     }
 }
 
-function aplicarPermissoesUsuario() {
-    const cardGestao = document.getElementById('card-gestao');
-    if (!cardGestao || !usuarioLogado) return;
-
-    if (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor') {
-        cardGestao.style.display = 'flex';
-    } else {
-        cardGestao.style.display = 'none';
-    }
-}
-
 function voltarHome() {
     document.getElementById('grid-home').style.display = 'grid';
     document.getElementById('conteudo-modulo').style.display = 'none';
@@ -2510,7 +2499,6 @@ function excluirUsuario(index) {
 }
  
 // --- MÓDULO PLANO ---
-// --- MÓDULO PLANO ---
 var db_plano_live = JSON.parse(localStorage.getItem('atlas_plano_live')) || null;
 var db_plano_hist = JSON.parse(localStorage.getItem('atlas_plano_hist')) || [];
 var destinosPlano = JSON.parse(localStorage.getItem('atlas_plano_destinos')) || ["Ansião", "Leiria", "Algarve", "Sobreda", "Abrantes"];
@@ -2544,31 +2532,6 @@ function formatarDataPlanoBR(dataISO) {
 function togglePlanoElemento(id) {
     const el = document.getElementById(id);
     if (el) el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
-}
-function renderizarMenuPlanoNovo() {
-    const render = document.getElementById('render-modulo');
-    if (!render) return;
-    render.innerHTML = `
-        <div id="container-menu-plano" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; padding:15px;">
-            <div class="card" onclick="exibirMenuCriacaoPlano()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; ${usuarioPodeCriarPlano() ? '' : 'opacity:0.55;'}">
-                <i class="fas fa-plus" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
-                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Criar Plano</span>
-                <small style="color:#94a3b8;">${usuarioPodeCriarPlano() ? 'Pedidos e stock' : 'Sem permissao para criar'}</small>
-            </div>
-            <div class="card" onclick="listarHistoricoPlano()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
-                <i class="fas fa-history" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
-                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico</span>
-                <small style="color:#94a3b8;">Planos finalizados</small>
-            </div>
-            ${usuarioPodeVerAnalisePlano() ? `
-            <div class="card" onclick="listarAnaliseMensalComprador()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; grid-column:1 / -1;">
-                <i class="fas fa-chart-pie" style="color:#10b981; font-size:2.5rem; margin-bottom:15px;"></i>
-                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico por Comprador</span>
-                <small style="color:#94a3b8;">Resumo mensal da empresa</small>
-            </div>` : ''}
-        </div>
-        <div id="container-acao-plano" style="display:none; padding:15px;"></div>
-    `;
 }
 function alternarAbaPlano(mostrarAcao) {
     const menu = document.getElementById('container-menu-plano');
@@ -2890,37 +2853,410 @@ function listarHistoricoPlano() {
     });
     c.innerHTML = html + `</div>`;
 }
+function renderizarMenuPlanoNovo() {
+    const render = document.getElementById('render-modulo');
+    if (!render) return;
+
+    render.innerHTML = `
+        <div id="container-menu-plano" style="display:grid; grid-template-columns:1fr 1fr; gap:15px; padding:15px;">
+            <div class="card" onclick="exibirMenuCriacaoPlano()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; ${usuarioPodeCriarPlano() ? '' : 'opacity:0.55;'}">
+                <i class="fas fa-plus" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Criar Plano</span>
+                <small style="color:#94a3b8;">${usuarioPodeCriarPlano() ? 'Pedidos e stock' : 'Sem permissao para criar'}</small>
+            </div>
+
+            <div class="card" onclick="listarHistoricoPlano()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                <i class="fas fa-history" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico</span>
+                <small style="color:#94a3b8;">Planos finalizados</small>
+            </div>
+
+            ${usuarioPodeVerAnalisePlano() ? `
+            <div class="card" onclick="abrirMenuHistoricoComprador()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; grid-column:1 / -1;">
+                <i class="fas fa-chart-pie" style="color:#10b981; font-size:2.5rem; margin-bottom:15px;"></i>
+                <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico por Comprador</span>
+                <small style="color:#94a3b8;">Resumo mensal e anual da empresa</small>
+            </div>` : ''}
+        </div>
+
+        <div id="container-acao-plano" style="display:none; padding:15px;"></div>
+    `;
+}
+
+function normalizarIdPlano(texto) {
+    return String(texto || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-');
+}
+
+function abrirMenuHistoricoComprador() {
+    if (!usuarioPodeVerAnalisePlano()) return alert('Sem permissao.');
+    if (!alternarAbaPlano(true)) return;
+
+    const c = document.getElementById('container-acao-plano');
+    if (!c) return;
+
+    c.innerHTML = `
+        <div style="color:white;">
+            <div style="display:flex; align-items:center; margin-bottom:20px;">
+                <button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2 style="border-bottom:2px solid #10b981; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">
+                    Historico por Comprador
+                </h2>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                <div class="card" onclick="listarAnaliseMensalComprador()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                    <i class="fas fa-calendar-alt" style="color:#3b82f6; font-size:2.2rem; margin-bottom:12px;"></i>
+                    <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico Mensal</span>
+                    <small style="color:#94a3b8;">Clientes e compras do mes</small>
+                </div>
+
+                <div class="card" onclick="listarAnaliseAnualComprador()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                    <i class="fas fa-trophy" style="color:#10b981; font-size:2.2rem; margin-bottom:12px;"></i>
+                    <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Historico Anual</span>
+                    <small style="color:#94a3b8;">Ranking anual dos compradores</small>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function gerarBaseResumoCompradores() {
+    const mensal = {};
+    const anual = {};
+
+    db_plano_hist.forEach(rel => {
+        const chaveMes = `${rel.ano}-${String(rel.mes).padStart(2, '0')}`;
+        const chaveAno = String(rel.ano);
+
+        if (!mensal[chaveMes]) mensal[chaveMes] = {};
+        if (!anual[chaveAno]) anual[chaveAno] = {};
+
+        rel.itens
+            .filter(item => item.modo === 'pedido' && item.destino)
+            .forEach(item => {
+                const destino = item.destino;
+                const tipo = item.tipo;
+                const ral = `${item.ralInferior}/${item.ralSuperior}`;
+
+                if (!mensal[chaveMes][destino]) {
+                    mensal[chaveMes][destino] = { total: 0, tipos: {}, rals: {}, itens: [] };
+                }
+                if (!anual[chaveAno][destino]) {
+                    anual[chaveAno][destino] = { total: 0, tipos: {}, rals: {}, itens: [] };
+                }
+
+                mensal[chaveMes][destino].total += item.totalMetros;
+                anual[chaveAno][destino].total += item.totalMetros;
+
+                if (!mensal[chaveMes][destino].tipos[tipo]) mensal[chaveMes][destino].tipos[tipo] = 0;
+                if (!anual[chaveAno][destino].tipos[tipo]) anual[chaveAno][destino].tipos[tipo] = 0;
+
+                mensal[chaveMes][destino].tipos[tipo] += item.totalMetros;
+                anual[chaveAno][destino].tipos[tipo] += item.totalMetros;
+
+                const chaveRalMensal = `${tipo}|${ral}`;
+                const chaveRalAnual = `${tipo}|${ral}`;
+
+                if (!mensal[chaveMes][destino].rals[chaveRalMensal]) mensal[chaveMes][destino].rals[chaveRalMensal] = 0;
+                if (!anual[chaveAno][destino].rals[chaveRalAnual]) anual[chaveAno][destino].rals[chaveRalAnual] = 0;
+
+                mensal[chaveMes][destino].rals[chaveRalMensal] += item.totalMetros;
+                anual[chaveAno][destino].rals[chaveRalAnual] += item.totalMetros;
+
+                mensal[chaveMes][destino].itens.push(item);
+                anual[chaveAno][destino].itens.push(item);
+            });
+    });
+
+    return { mensal, anual };
+}
+
 function listarAnaliseMensalComprador() {
     if (!usuarioPodeVerAnalisePlano()) return alert('Sem permissao.');
     if (!alternarAbaPlano(true)) return;
+
     const c = document.getElementById('container-acao-plano');
-    const meses = {};
-    db_plano_hist.forEach(rel => {
-        const chaveMes = `${rel.ano}-${String(rel.mes).padStart(2,'0')}`;
-        meses[chaveMes] ||= {};
-        rel.itens.filter(i=>i.modo==='pedido' && i.destino).forEach(item => {
-            meses[chaveMes][item.destino] ||= { total:0, tipos:{}, cores:{} };
-            meses[chaveMes][item.destino].total += item.totalMetros;
-            const t = item.tipo;
-            const cor = `${item.ralInferior}/${item.ralSuperior}`;
-            meses[chaveMes][item.destino].tipos[t] ||= 0;
-            meses[chaveMes][item.destino].tipos[t] += item.totalMetros;
-            meses[chaveMes][item.destino].cores[`${t}|${cor}`] ||= 0;
-            meses[chaveMes][item.destino].cores[`${t}|${cor}`] += item.totalMetros;
-        });
-    });
-    let html = `<div style="color:white;"><div style="display:flex; align-items:center; margin-bottom:20px;"><button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;"><i class="fas fa-arrow-left"></i></button><h2 style="border-bottom:2px solid #10b981; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">Historico por Comprador</h2></div>`;
-    Object.keys(meses).sort().reverse().forEach(chave => {
-        const [ano, mes] = chave.split('-');
-        html += `<div style="margin-bottom:10px;"><div onclick="togglePlanoElemento('analise-${chave}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155;">${MESES_PT[parseInt(mes,10)]} / ${ano}</div><div id="analise-${chave}" style="display:none; margin-top:8px;">`;
-        Object.keys(meses[chave]).sort((a,b)=>meses[chave][b].total-meses[chave][a].total).forEach(dest => {
-            const d = meses[chave][dest];
-            html += `<div style="background:#111827; border:1px solid #334155; border-radius:8px; padding:12px; margin-bottom:10px;"><div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;"><span><b>${dest}</b></span><span style="color:#10b981;"><b>${d.total.toFixed(2)} m</b></span></div><div style="margin-top:8px; color:#94a3b8; font-size:12px;">${Object.entries(d.tipos).map(([t,v])=>`${t}: ${v.toFixed(2)} m`).join(' | ')}</div><div style="margin-top:8px; color:white; font-size:12px;">${Object.entries(d.cores).map(([k,v])=>{ const [tipo, cor] = k.split('|'); return `${tipo} - ${cor}: ${v.toFixed(2)} m`; }).join('<br>')}</div></div>`;
-        });
+    if (!c) return;
+
+    const { mensal } = gerarBaseResumoCompradores();
+
+    let html = `
+        <div style="color:white;">
+            <div style="display:flex; align-items:center; margin-bottom:20px;">
+                <button onclick="abrirMenuHistoricoComprador()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2 style="border-bottom:2px solid #10b981; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">
+                    Historico Mensal por Comprador
+                </h2>
+            </div>
+    `;
+
+    const mesesOrdenados = Object.keys(mensal).sort().reverse();
+
+    if (mesesOrdenados.length === 0) {
+        html += `<div style="text-align:center; padding:50px; color:gray;">Nenhum dado mensal encontrado.</div>`;
+    }
+
+    mesesOrdenados.forEach(chaveMes => {
+        const [ano, mes] = chaveMes.split('-');
+        const clientes = mensal[chaveMes];
+
+        html += `
+            <div style="margin-bottom:10px;">
+                <div onclick="togglePlanoElemento('mensal-${chaveMes}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+                    <span>${MESES_PT[parseInt(mes, 10)]} / ${ano}</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div id="mensal-${chaveMes}" style="display:none; margin-top:8px;">
+        `;
+
+        Object.keys(clientes)
+            .sort((a, b) => clientes[b].total - clientes[a].total)
+            .forEach((destino, index) => {
+                const dados = clientes[destino];
+                const idCliente = `mensal-${chaveMes}-${normalizarIdPlano(destino)}`;
+                const payload = encodeURIComponent(JSON.stringify({
+                    periodoTipo: 'mensal',
+                    periodoLabel: `${MESES_PT[parseInt(mes, 10)]} / ${ano}`,
+                    comprador: destino,
+                    total: dados.total,
+                    tipos: dados.tipos,
+                    rals: dados.rals,
+                    ranking: index + 1
+                }));
+
+                html += `
+                    <div style="background:#111827; border:1px solid #334155; border-radius:8px; margin-bottom:10px;">
+                        <div onclick="togglePlanoElemento('${idCliente}')" style="padding:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <span><b>#${index + 1} ${destino}</b></span>
+                            <span style="color:#10b981; font-weight:bold;">${dados.total.toFixed(2)} m</span>
+                        </div>
+
+                        <div id="${idCliente}" style="display:none; padding:12px; border-top:1px solid #334155;">
+                            <div style="margin-bottom:10px; color:#94a3b8; font-size:12px;">
+                                ${Object.entries(dados.tipos)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([tipo, total]) => `${tipo}: ${total.toFixed(2)} m`)
+                                    .join(' | ')}
+                            </div>
+
+                            <div style="margin-bottom:10px; color:white; font-size:12px;">
+                                ${Object.entries(dados.rals)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([chaveRal, total]) => {
+                                        const [tipo, ral] = chaveRal.split('|');
+                                        return `<div>${tipo} - ${ral}: <b>${total.toFixed(2)} m</b></div>`;
+                                    }).join('')}
+                            </div>
+
+                            <button onclick="gerarPDFResumoComprador('${payload}')" style="background:#10b981; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:11px;">
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
         html += `</div></div>`;
     });
+
     c.innerHTML = html + `</div>`;
 }
+function listarAnaliseAnualComprador() {
+    if (!usuarioPodeVerAnalisePlano()) return alert('Sem permissao.');
+    if (!alternarAbaPlano(true)) return;
+
+    const c = document.getElementById('container-acao-plano');
+    if (!c) return;
+
+    const { anual } = gerarBaseResumoCompradores();
+
+    let html = `
+        <div style="color:white;">
+            <div style="display:flex; align-items:center; margin-bottom:20px;">
+                <button onclick="abrirMenuHistoricoComprador()" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2 style="border-bottom:2px solid #10b981; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">
+                    Historico Anual por Comprador
+                </h2>
+            </div>
+    `;
+
+    const anosOrdenados = Object.keys(anual).sort().reverse();
+
+    if (anosOrdenados.length === 0) {
+        html += `<div style="text-align:center; padding:50px; color:gray;">Nenhum dado anual encontrado.</div>`;
+    }
+
+    anosOrdenados.forEach(ano => {
+        const clientes = anual[ano];
+
+        html += `
+            <div style="margin-bottom:10px;">
+                <div onclick="togglePlanoElemento('anual-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155; display:flex; justify-content:space-between; align-items:center;">
+                    <span>ANO ${ano}</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div id="anual-${ano}" style="display:none; margin-top:8px;">
+        `;
+
+        Object.keys(clientes)
+            .sort((a, b) => clientes[b].total - clientes[a].total)
+            .forEach((destino, index) => {
+                const dados = clientes[destino];
+                const idCliente = `anual-${ano}-${normalizarIdPlano(destino)}`;
+                const payload = encodeURIComponent(JSON.stringify({
+                    periodoTipo: 'anual',
+                    periodoLabel: `ANO ${ano}`,
+                    comprador: destino,
+                    total: dados.total,
+                    tipos: dados.tipos,
+                    rals: dados.rals,
+                    ranking: index + 1
+                }));
+
+                html += `
+                    <div style="background:#111827; border:1px solid #334155; border-radius:8px; margin-bottom:10px;">
+                        <div onclick="togglePlanoElemento('${idCliente}')" style="padding:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                            <span><b>#${index + 1} ${destino}</b></span>
+                            <span style="color:#10b981; font-weight:bold;">${dados.total.toFixed(2)} m</span>
+                        </div>
+
+                        <div id="${idCliente}" style="display:none; padding:12px; border-top:1px solid #334155;">
+                            <div style="margin-bottom:10px; color:#94a3b8; font-size:12px;">
+                                ${Object.entries(dados.tipos)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([tipo, total]) => `${tipo}: ${total.toFixed(2)} m`)
+                                    .join(' | ')}
+                            </div>
+
+                            <div style="margin-bottom:10px; color:white; font-size:12px;">
+                                ${Object.entries(dados.rals)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .map(([chaveRal, total]) => {
+                                        const [tipo, ral] = chaveRal.split('|');
+                                        return `<div>${tipo} - ${ral}: <b>${total.toFixed(2)} m</b></div>`;
+                                    }).join('')}
+                            </div>
+
+                            <button onclick="gerarPDFResumoComprador('${payload}')" style="background:#10b981; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:11px;">
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+        html += `</div></div>`;
+    });
+
+    c.innerHTML = html + `</div>`;
+}
+
+
+function gerarPDFResumoComprador(dadosEncoded) {
+    const dados = JSON.parse(decodeURIComponent(dadosEncoded));
+    const janela = window.open('', '_blank');
+
+    if (!janela) {
+        alert('O navegador bloqueou a abertura do PDF.');
+        return;
+    }
+
+    const htmlTipos = Object.entries(dados.tipos || {})
+        .sort((a, b) => b[1] - a[1])
+        .map(([tipo, total]) => `
+            <tr>
+                <td style="border:2px solid #000; text-align:center;">${tipo}</td>
+                <td style="border:2px solid #000; text-align:center; font-weight:bold;">${Number(total).toFixed(2)} m</td>
+            </tr>
+        `).join('');
+
+    const htmlRals = Object.entries(dados.rals || {})
+        .sort((a, b) => b[1] - a[1])
+        .map(([chaveRal, total]) => {
+            const [tipo, ral] = chaveRal.split('|');
+            return `
+                <tr>
+                    <td style="border:2px solid #000; text-align:center;">${tipo}</td>
+                    <td style="border:2px solid #000; text-align:center;">${ral}</td>
+                    <td style="border:2px solid #000; text-align:center; font-weight:bold;">${Number(total).toFixed(2)} m</td>
+                </tr>
+            `;
+        }).join('');
+
+    janela.document.write(`
+        <html>
+        <head>
+            <title>Resumo Comprador</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #000; }
+                table { width:100%; border-collapse:collapse; margin-top:15px; }
+                th, td { padding:8px; }
+                @media print {
+                    .no-print { display:none !important; }
+                    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <div style="display:flex; justify-content:space-between; border-bottom:5px solid #E31C24; background:#000; color:#fff; padding:15px; align-items:center;">
+                <div><b style="font-size:22px;">ATLAS PAINEL</b><br>RESUMO POR COMPRADOR</div>
+                <div style="text-align:right; font-weight:bold;">${dados.periodoLabel}<br>${dados.comprador}</div>
+            </div>
+
+            <div style="margin-top:20px; background:#f1f5f9; padding:12px; border:2px solid #000; text-align:center; font-weight:bold;">
+                ${dados.periodoTipo === 'anual' ? `RANKING #${dados.ranking} - ` : ''}${dados.comprador} - TOTAL ${Number(dados.total).toFixed(2)} m
+            </div>
+
+            <div style="margin-top:20px;">
+                <div style="background:#000; color:#fff; padding:8px; text-align:center; font-weight:bold; border:2px solid #000;">TOTAIS POR TIPO DE CHAPA</div>
+                <table>
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000;">Tipo</th>
+                            <th style="border:2px solid #000;">Metros</th>
+                        </tr>
+                    </thead>
+                    <tbody>${htmlTipos}</tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:20px;">
+                <div style="background:#000; color:#fff; padding:8px; text-align:center; font-weight:bold; border:2px solid #000;">DETALHES POR RAL</div>
+                <table>
+                    <thead>
+                        <tr style="background:#eee;">
+                            <th style="border:2px solid #000;">Tipo</th>
+                            <th style="border:2px solid #000;">RAL</th>
+                            <th style="border:2px solid #000;">Metros</th>
+                        </tr>
+                    </thead>
+                    <tbody>${htmlRals}</tbody>
+                </table>
+            </div>
+
+            <div class="no-print" style="margin-top:20px; text-align:center;">
+                <button onclick="window.print()" style="padding:20px; background:#000; color:#fff; border:3px solid #E31C24; width:100%; font-size:18px; font-weight:bold; border-radius:10px;">
+                    CONFIRMAR E GERAR PDF
+                </button>
+            </div>
+        </body>
+        </html>
+    `);
+
+    janela.document.close();
+}
+
 function visualizarPlanoDigital(dadosEncoded) {
     gerarPDF_Plano(dadosEncoded);
 }
@@ -2993,7 +3329,7 @@ htmlGrupos += `
     <tr>
         <td style="border:2px solid #000; text-align:center;">${item.ralInferior}/${item.ralSuperior}</td>
         <td style="border:2px solid #000; text-align:center;">${item.quantidadeChapas} un.</td>
-        <td style="border:2px solid #000; text-align:center; font-weight:bold;">${formatarMedidaRelatorio(item.metrosUnidade)}un</td>
+        <td style="border:2px solid #000; text-align:center; font-weight:bold;">${formatarMedidaRelatorio(item.metrosUnidade)}</td>
         <td style="border:2px solid #000; text-align:center; font-weight:bold;">${formatarTotalRelatorio(item.totalMetros)}</td>
   </tr>
 `).join('')}
@@ -3139,5 +3475,4 @@ function formatarTotalRelatorio(metros) {
 
     return `${mm} (${metrosTexto} metros)`;
 }
-
 
