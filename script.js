@@ -1,4 +1,31 @@
 // --- BANCO DE USUARIOS ---
+// 1. Importações corrigidas para funcionar no Navegador (HTML/JS puro)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+// 2. Sua configuração oficial
+const firebaseConfig = {
+  apiKey: "AIzaSyD2U9ew3OjPsoPjYaoCxkbd9Ba0xN4Rqbc",
+  authDomain: "atlas-5cebe.firebaseapp.com",
+  projectId: "atlas-5cebe",
+  storageBucket: "atlas-5cebe.firebasestorage.app",
+  messagingSenderId: "269009214793",
+  appId: "1:269009214793:web:e26eece10ed2f715974e98",
+  measurementId: "G-23J1DJDCBQ"
+};
+
+// 3. Inicialização dos serviços
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app); // Banco de dados
+const auth = getAuth(app);    // Autenticação
+
+// --- AQUI COMEÇA A CONEXÃO COM SEU HTML ---
+// Precisamos exportar as funções para o 'window' para os botões funcionarem
+window.fazerLogin = fazerLogin;
+window.abrirModulo = abrirModulo;
+window.voltarHome = voltarHome;
+window.fecharModal = fecharModal;
 let usuariosSistema = JSON.parse(localStorage.getItem('atlas_usuarios')) || [
     { id: "admin", senha: "123", cargo: "admin" }
 ];
