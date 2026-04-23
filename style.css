@@ -224,3 +224,77 @@ header {
 @media (min-width: 1025px) {
     .grid-container { grid-template-columns: repeat(4, 1fr); gap: 25px; padding: 40px 10%; }
 }
+body.tema-claro {
+    --bg-deep: #f3f6fb;
+    --bg-card: #ffffff;
+    --accent: #2563eb;
+    --atlas-red: #E31C24;
+    --success: #10b981;
+    --text-white: #0f172a;
+    --border: #cbd5e1;
+    --input-bg: #ffffff;
+}
+
+body.tema-claro .card span,
+body.tema-claro h1,
+body.tema-claro h2,
+body.tema-claro h3,
+body.tema-claro label,
+body.tema-claro p,
+body.tema-claro small,
+body.tema-claro div,
+body.tema-claro span {
+    color: inherit;
+}
+
+body.tema-claro header {
+    background: #ffffff;
+}
+
+body.tema-claro input,
+body.tema-claro select,
+body.tema-claro textarea {
+    color: #0f172a !important;
+    background: #ffffff !important;
+}
+
+body.tema-claro .login-box {
+    background: #ffffff;
+}
+
+body.tema-claro .btn-voltar-clean {
+    background-color: #64748b !important;
+}
+body.tema-claro {
+    background-color: #f3f6fb !important;
+    color: #0f172a !important;
+}
+
+body.tema-claro main,
+body.tema-claro #app-principal,
+body.tema-claro #grid-home,
+body.tema-claro #conteudo-modulo {
+    background: #f3f6fb !important;
+    color: #0f172a !important;
+}
+
+body.tema-claro .card {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+
+body.tema-claro .card i,
+body.tema-claro .card span,
+body.tema-claro #titulo-modulo,
+body.tema-claro #user-display {
+    color: #0f172a !important;
+}
+
+@media (max-width: 768px) {
+    #conteudo-ajustes > div,
+    #conteudo-ajustes div[style*="grid-template-columns:1fr 1fr"] {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+}
