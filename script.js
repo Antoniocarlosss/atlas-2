@@ -1,31 +1,9 @@
 // --- BANCO DE USUARIOS ---
-// 1. Importações do Firebase
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-// 2. Configuração oficial
-const firebaseConfig = {
-  apiKey: "AIzaSyD2U9ew3OjPsoPjYaoCxkbd9Ba0xN4Rqbc",
-  authDomain: "atlas-5cebe.firebaseapp.com",
-  projectId: "atlas-5cebe",
-  storageBucket: "atlas-5cebe.firebasestorage.app",
-  messagingSenderId: "269009214793",
-  appId: "1:269009214793:web:e26eece10ed2f715974e98",
-  measurementId: "G-23J1DJDCBQ"
-};
-
-// 3. Inicialização
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// --- VARIÁVEIS DE CONTROLE ---
 let usuariosSistema = JSON.parse(localStorage.getItem('atlas_usuarios')) || [
     { id: "admin", senha: "123", cargo: "admin" }
 ];
-let usuarioLogado = null;
 
+let usuarioLogado = null;
 const MODULOS_SISTEMA = [
     { chave: 'injecao', nome: 'Injeção' },
     { chave: 'bobines', nome: 'Bobines' },
@@ -36,7 +14,6 @@ const MODULOS_SISTEMA = [
     { chave: 'config', nome: 'Ajustes' }
 ];
 
-// --- FUNÇÕES AUXILIARES ---
 function obterChavePreferenciasUsuario(idUsuario) {
     return `atlas_pref_${String(idUsuario || '').toLowerCase()}`;
 }
@@ -51,11 +28,20 @@ function obterPreferenciasPadraoUsuario() {
 function obterPreferenciasUsuario(idUsuario) {
     const chave = obterChavePreferenciasUsuario(idUsuario);
     const salvas = JSON.parse(localStorage.getItem(chave));
-    if (!salvas) return obterPreferenciasPadraoUsuario();
+
+    if (!salvas) {
+        return obterPreferenciasPadraoUsuario();
+    }
+
     return {
         tema: salvas.tema || 'escuro',
         modulosVisiveis: Array.isArray(salvas.modulosVisiveis) ? salvas.modulosVisiveis : obterPreferenciasPadraoUsuario().modulosVisiveis
     };
+}
+
+function salvarPreferenciasUsuario(idUsuario, preferencias) {
+    const chave = obterChavePreferenciasUsuario(idUsuario);
+    localStorage.setItem(chave, JSON.stringify(preferencias));
 }
 
 function aplicarTemaUsuario(tema) {
@@ -64,8 +50,10 @@ function aplicarTemaUsuario(tema) {
 
 function aplicarPreferenciasVisuaisUsuario() {
     if (!usuarioLogado) return;
+
     const preferencias = obterPreferenciasUsuario(usuarioLogado.id);
     aplicarTemaUsuario(preferencias.tema);
+
     const gridHome = document.getElementById('grid-home');
     if (!gridHome) return;
 
@@ -74,14 +62,21 @@ function aplicarPreferenciasVisuaisUsuario() {
         const onclick = card.getAttribute('onclick') || '';
         const match = onclick.match(/abrirModulo\('([^']+)'\)/);
         if (!match) return;
+
         const nomeModulo = match[1];
-        if (nomeModulo === 'config') { card.style.display = ''; return; }
+
+        if (nomeModulo === 'config') {
+            card.style.display = '';
+            return;
+        }
+
         if (nomeModulo === 'gestao') {
             const podeVerGestao = usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor';
             const estaSelecionado = preferencias.modulosVisiveis.includes('gestao');
             card.style.display = podeVerGestao && estaSelecionado ? '' : 'none';
             return;
         }
+
         card.style.display = preferencias.modulosVisiveis.includes(nomeModulo) ? '' : 'none';
     });
 }
@@ -93,11 +88,10 @@ function inicializarUsuarios() {
         localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
     }
 }
+
 inicializarUsuarios();
 
-// --- FUNÇÕES PRINCIPAIS (CONECTADAS AO WINDOW PARA O HTML VER) ---
-
-window.fazerLogin = function() {
+function fazerLogin() {
     const usuarioInput = document.getElementById('login-email').value.trim();
     const senhaInput = document.getElementById('login-senha').value.trim();
 
@@ -116,26 +110,31 @@ window.fazerLogin = function() {
         document.getElementById('app-principal').style.display = 'block';
         document.getElementById('user-display').innerText = usuarioEncontrado.id.toUpperCase();
 
-        if (typeof aplicarPermissoesUsuario === "function") aplicarPermissoesUsuario();
-        aplicarPreferenciasVisuaisUsuario();
-        console.log("Login realizado! Firebase pronto para uso.");
+       aplicarPermissoesUsuario();
+aplicarPreferenciasVisuaisUsuario();
+
+if (typeof producoesDoDia !== "undefined") {
+
+            producoesDoDia = [];
+        }
     } else {
         alert("Acesso Negado!");
     }
-};
+}
 
-window.voltarHome = function() {
+function voltarHome() {
     document.getElementById('grid-home').style.display = 'grid';
     document.getElementById('conteudo-modulo').style.display = 'none';
-    if (typeof aplicarPermissoesUsuario === "function") aplicarPermissoesUsuario();
+    aplicarPermissoesUsuario();
     aplicarPreferenciasVisuaisUsuario();
-};
+}
 
-window.fecharModal = function() {
+function fecharModal() {
     document.getElementById('modal-edicao').style.display = 'none';
-};
+}
 
-window.abrirModulo = function(nome) {
+
+function abrirModulo(nome) {
     if (nome === 'gestao' && (!usuarioLogado || (usuarioLogado.cargo !== 'admin' && usuarioLogado.cargo !== 'supervisor'))) {
         alert("Apenas ADMIN ou SUPERVISOR podem acessar a Gestão.");
         return;
@@ -145,8 +144,13 @@ window.abrirModulo = function(nome) {
     document.getElementById('conteudo-modulo').style.display = 'block';
 
     const titulos = {
-        injecao: "INJEÇÃO", bobines: "BOBINES", serra: "SERRA",
-        embalagem: "EMBALAGEM", plano: "PLANO", gestao: "GESTÃO", config: "AJUSTES"
+        injecao: "INJEÇÃO",
+        bobines: "BOBINES",
+        serra: "SERRA",
+        embalagem: "EMBALAGEM",
+        plano: "PLANO",
+        gestao: "GESTÃO",
+        config: "AJUSTES"
     };
 
     document.getElementById('titulo-modulo').innerText = titulos[nome];
@@ -158,7 +162,7 @@ window.abrirModulo = function(nome) {
                 <div class="card" onclick="exibirFormulario('injecao')"><i class="fas fa-plus"></i><span>Novo Relatório</span></div>
                 <div class="card" onclick="exibirHistoricoModulo('injecao')"><i class="fas fa-history"></i><span>Histórico</span></div>
             </div>`;
-    }
+    } 
     else if (nome === 'bobines') {
         renderizarMenuBobines();
     } 
