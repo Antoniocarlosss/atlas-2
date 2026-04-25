@@ -4880,4 +4880,340 @@ renderizarGestaoPlanoHistorico = function(indexPlano) {
 
     topo.appendChild(btn);
 };
+/* ==========================================================
+   MÓDULO CONFERÊNCIA - PEDIDOS DA SERRA
+   ========================================================== */
+
+let db_conferencia_serra = JSON.parse(localStorage.getItem('atlas_conferencia_serra')) || [];
+
+if (typeof MODULOS_SISTEMA !== 'undefined' && !MODULOS_SISTEMA.some(m => m.chave === 'conferencia')) {
+    MODULOS_SISTEMA.push({ chave: 'conferencia', nome: 'Conferência' });
+}
+
+const abrirModuloOriginalConferencia = abrirModulo;
+abrirModulo = function(nome) {
+    if (nome === 'conferencia') {
+        document.getElementById('grid-home').style.display = 'none';
+        document.getElementById('conteudo-modulo').style.display = 'block';
+        document.getElementById('titulo-modulo').innerText = 'CONFERÊNCIA';
+        renderizarMenuConferenciaSerra();
+        return;
+    }
+
+    abrirModuloOriginalConferencia(nome);
+};
+
+const aplicarPreferenciasOriginalConferencia = aplicarPreferenciasVisuaisUsuario;
+aplicarPreferenciasVisuaisUsuario = function() {
+    aplicarPreferenciasOriginalConferencia();
+
+    const card = document.getElementById('card-conferencia');
+    if (card) card.style.display = '';
+};
+
+function salvarConferenciaSerra() {
+    localStorage.setItem('atlas_conferencia_serra', JSON.stringify(db_conferencia_serra));
+}
+
+function textoSeguroConferencia(valor) {
+    return String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function extrairNumeroPedidoSerra(desc) {
+    const texto = String(desc || '');
+    const match = texto.match(/PED:\s*(.+)/i);
+    return match ? match[1].trim() : '';
+}
+
+function registrarPedidosSerraParaConferencia(itens, meta) {
+    const pedidos = itens.filter(item => extrairNumeroPedidoSerra(item.desc));
+
+    pedidos.forEach((item, index) => {
+        const pedidoNumero = extrairNumeroPedidoSerra(item.desc);
+        const qtd = Number(item.qtd || 1);
+        const chavePedido = `${meta.data}|${pedidoNumero}`;
+        let pedido = db_conferencia_serra.find(p => p.chavePedido === chavePedido);
+
+        if (!pedido) {
+            pedido = {
+                id: Date.now() + Math.floor(Math.random() * 1000) + index,
+                chavePedido,
+                pedidoNumero,
+                data: meta.data,
+                dia: meta.dia,
+                mes: meta.mes,
+                ano: meta.ano,
+                operadorSerra: meta.operador,
+                status: 'aberto',
+                finalizadoPor: '',
+                finalizadoEm: '',
+                unidades: []
+            };
+            db_conferencia_serra.push(pedido);
+        }
+
+        for (let i = 1; i <= qtd; i++) {
+            pedido.unidades.push({
+                id: Date.now() + Math.floor(Math.random() * 100000) + i,
+                status: 'pendente',
+                conferidoPor: '',
+                conferidoEm: '',
+                observacao: '',
+                tipo: item.tipo,
+                esp: item.esp,
+                ralI: item.ralI,
+                ralS: item.ralS,
+                metros: Number(item.metros || 0),
+                qtdOriginal: qtd,
+                unidade: i
+            });
+        }
+
+        pedido.status = 'aberto';
+    });
+
+    salvarConferenciaSerra();
+}
+
+const fecharDiaSerraOriginalConferencia = fecharDiaSerra;
+fecharDiaSerra = function() {
+    if (db_serra_live.length === 0) {
+        fecharDiaSerraOriginalConferencia();
+        return;
+    }
+
+    const itensAntesDeFechar = [...db_serra_live];
+    const seletorData = document.getElementById('h-data-rel-serra')?.value;
+    let dataFinal, dia, mes, ano;
+
+    if (seletorData) {
+        const partes = seletorData.split('-');
+        ano = partes[0];
+        mes = partes[1];
+        dia = partes[2];
+        dataFinal = `${dia}/${mes}/${ano}`;
+    } else {
+        const hoje = new Date();
+        dataFinal = hoje.toLocaleDateString('pt-BR');
+        dia = String(hoje.getDate()).padStart(2, '0');
+        mes = String(hoje.getMonth() + 1).padStart(2, '0');
+        ano = hoje.getFullYear();
+    }
+
+    const operador = document.getElementById('user-display')?.innerText || 'OP. SERRA';
+
+    fecharDiaSerraOriginalConferencia();
+
+    registrarPedidosSerraParaConferencia(itensAntesDeFechar, {
+        data: dataFinal,
+        dia,
+        mes: parseInt(mes, 10),
+        ano,
+        operador
+    });
+};
+
+function renderizarMenuConferenciaSerra() {
+    const render = document.getElementById('render-modulo');
+    const mesesNome = ["", "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+    const agrupado = {};
+
+    db_conferencia_serra.forEach(pedido => {
+        agrupado[pedido.ano] ||= {};
+        agrupado[pedido.ano][pedido.mes] ||= {};
+        agrupado[pedido.ano][pedido.mes][pedido.dia] ||= [];
+        agrupado[pedido.ano][pedido.mes][pedido.dia].push(pedido);
+    });
+
+    let html = `
+        <div style="padding:15px; color:white;">
+            <h2 style="border-bottom:2px solid #10b981; padding-bottom:10px; margin-top:0;">Conferência de Pedidos</h2>
+    `;
+
+    if (db_conferencia_serra.length === 0) {
+        html += `<div style="text-align:center; padding:50px; color:#94a3b8;">Nenhum pedido da Serra enviado para conferência.</div>`;
+    }
+
+    Object.keys(agrupado).sort((a,b) => b-a).forEach(ano => {
+        html += `
+            <div onclick="toggleElemento('conf-ano-${ano}')" style="background:#1e293b; padding:12px; border-radius:8px; margin-bottom:8px; cursor:pointer; font-weight:bold; border:1px solid #334155; display:flex; justify-content:space-between;">
+                <span>ANO ${ano}</span>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div id="conf-ano-${ano}" style="display:none; padding-left:10px; border-left:2px solid #10b981;">
+        `;
+
+        Object.keys(agrupado[ano]).sort((a,b) => b-a).forEach(mes => {
+            html += `
+                <div onclick="toggleElemento('conf-mes-${ano}-${mes}')" style="background:#0f172a; color:#3b82f6; padding:10px; border-radius:6px; margin:6px 0; cursor:pointer; font-weight:bold;">
+                    ${mesesNome[mes] || mes}
+                </div>
+                <div id="conf-mes-${ano}-${mes}" style="display:none; padding-left:10px;">
+            `;
+
+            Object.keys(agrupado[ano][mes]).sort((a,b) => b-a).forEach(dia => {
+                const pedidosDia = agrupado[ano][mes][dia];
+                const diaFinalizado = pedidosDia.every(p => p.status === 'finalizado');
+                const corDia = diaFinalizado ? '#10b981' : '#f59e0b';
+                const textoDia = diaFinalizado ? 'FINALIZADO' : 'EM ABERTO';
+
+                html += `
+                    <div style="background:#111827; border:1px solid #334155; border-left:5px solid ${corDia}; border-radius:8px; margin-bottom:10px; overflow:hidden;">
+                        <div onclick="toggleElemento('conf-dia-${ano}-${mes}-${dia}')" style="padding:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;">
+                            <b>DIA ${dia}/${String(mes).padStart(2, '0')}</b>
+                            <span style="background:${corDia}; color:white; font-size:11px; padding:5px 8px; border-radius:6px; font-weight:bold;">${textoDia}</span>
+                        </div>
+                        <div id="conf-dia-${ano}-${mes}-${dia}" style="display:none; padding:10px; border-top:1px solid #334155;">
+                            ${pedidosDia.map(pedido => `
+                                <button onclick="abrirPedidoConferenciaSerra(${pedido.id})" style="width:100%; background:#1e293b; color:white; border:1px solid #334155; padding:12px; border-radius:8px; margin-bottom:8px; text-align:left; display:flex; justify-content:space-between; align-items:center;">
+                                    <span>
+                                        <b>PEDIDO ${textoSeguroConferencia(pedido.pedidoNumero)}</b><br>
+                                        <small style="color:#94a3b8;">${pedido.unidades.length} unidade(s)</small>
+                                    </span>
+                                    <span style="color:${pedido.status === 'finalizado' ? '#10b981' : '#f59e0b'}; font-weight:bold; font-size:11px;">
+                                        ${pedido.status === 'finalizado' ? 'OK' : 'ABERTO'}
+                                    </span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+        });
+
+        html += `</div>`;
+    });
+
+    render.innerHTML = html + `</div>`;
+}
+
+function abrirPedidoConferenciaSerra(idPedido) {
+    const pedido = db_conferencia_serra.find(p => String(p.id) === String(idPedido));
+    if (!pedido) return alert('Pedido não encontrado.');
+
+    const render = document.getElementById('render-modulo');
+
+    const totalOk = pedido.unidades.filter(u => u.status === 'ok').length;
+    const totalNao = pedido.unidades.filter(u => u.status === 'nao').length;
+    const totalPendente = pedido.unidades.filter(u => u.status === 'pendente').length;
+
+    render.innerHTML = `
+        <div style="padding:15px; color:white;">
+            <button onclick="renderizarMenuConferenciaSerra()" style="background:none; border:none; color:#94a3b8; font-size:18px; margin-bottom:15px; cursor:pointer;">
+                <i class="fas fa-arrow-left"></i> VOLTAR
+            </button>
+
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:15px; margin-bottom:15px;">
+                <h2 style="margin:0 0 8px 0; font-size:18px;">PEDIDO ${textoSeguroConferencia(pedido.pedidoNumero)}</h2>
+                <div style="color:#94a3b8; font-size:12px;">
+                    Data Serra: ${pedido.data}<br>
+                    Operador Serra: ${textoSeguroConferencia(pedido.operadorSerra)}
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px;">
+                    <div style="background:#0f172a; padding:10px; border-radius:8px; text-align:center; color:#10b981; font-weight:bold;">OK<br>${totalOk}</div>
+                    <div style="background:#0f172a; padding:10px; border-radius:8px; text-align:center; color:#ef4444; font-weight:bold;">NÃO<br>${totalNao}</div>
+                    <div style="background:#0f172a; padding:10px; border-radius:8px; text-align:center; color:#f59e0b; font-weight:bold;">PENDENTE<br>${totalPendente}</div>
+                </div>
+
+                ${pedido.status === 'finalizado' ? `
+                    <div style="margin-top:10px; background:#052e16; color:#86efac; padding:10px; border-radius:8px; font-size:12px;">
+                        Finalizado por ${textoSeguroConferencia(pedido.finalizadoPor)} em ${textoSeguroConferencia(pedido.finalizadoEm)}
+                    </div>
+                ` : ''}
+            </div>
+
+            ${pedido.unidades.map((unidade, idx) => {
+                const cor = unidade.status === 'ok' ? '#10b981' : unidade.status === 'nao' ? '#ef4444' : '#f59e0b';
+                const textoStatus = unidade.status === 'ok' ? 'OK' : unidade.status === 'nao' ? 'NÃO OK' : 'PENDENTE';
+
+                return `
+                    <div style="background:#111827; border:1px solid #334155; border-left:5px solid ${cor}; border-radius:10px; padding:12px; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+                            <div>
+                                <b>Unidade ${idx + 1}</b><br>
+                                <small style="color:#94a3b8;">
+                                    ${textoSeguroConferencia(unidade.tipo)} ${textoSeguroConferencia(unidade.esp)} mm<br>
+                                    ${Number(unidade.metros || 0).toFixed(2)} m | RAL ${textoSeguroConferencia(unidade.ralI)}/${textoSeguroConferencia(unidade.ralS)}
+                                </small>
+                            </div>
+                            <span style="background:${cor}; color:white; padding:5px 8px; border-radius:6px; font-size:11px; font-weight:bold;">
+                                ${textoStatus}
+                            </span>
+                        </div>
+
+                        ${unidade.observacao ? `<div style="color:#fca5a5; font-size:12px; margin-top:8px;">Obs: ${textoSeguroConferencia(unidade.observacao)}</div>` : ''}
+
+                        ${pedido.status !== 'finalizado' ? `
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
+                                <button onclick="marcarUnidadeConferenciaSerra(${pedido.id}, ${unidade.id}, 'ok')" style="background:#10b981; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">
+                                    OK
+                                </button>
+                                <button onclick="marcarUnidadeConferenciaSerra(${pedido.id}, ${unidade.id}, 'nao')" style="background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">
+                                    NÃO OK
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('')}
+
+            ${pedido.status !== 'finalizado' ? `
+                <button onclick="finalizarPedidoConferenciaSerra(${pedido.id})" style="width:100%; background:#10b981; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; margin-top:10px;">
+                    FINALIZAR PEDIDO
+                </button>
+            ` : ''}
+        </div>
+    `;
+}
+
+function marcarUnidadeConferenciaSerra(idPedido, idUnidade, status) {
+    const pedido = db_conferencia_serra.find(p => String(p.id) === String(idPedido));
+    if (!pedido || pedido.status === 'finalizado') return;
+
+    const unidade = pedido.unidades.find(u => String(u.id) === String(idUnidade));
+    if (!unidade) return;
+
+    unidade.status = status;
+    unidade.conferidoPor = document.getElementById('user-display')?.innerText || usuarioLogado?.id || 'SEM USUARIO';
+    unidade.conferidoEm = new Date().toLocaleString('pt-BR');
+
+    if (status === 'nao') {
+        unidade.observacao = prompt('Motivo / observação:', unidade.observacao || '') || '';
+    } else {
+        unidade.observacao = '';
+    }
+
+    salvarConferenciaSerra();
+    abrirPedidoConferenciaSerra(idPedido);
+}
+
+function finalizarPedidoConferenciaSerra(idPedido) {
+    const pedido = db_conferencia_serra.find(p => String(p.id) === String(idPedido));
+    if (!pedido) return;
+
+    const pendentes = pedido.unidades.filter(u => u.status === 'pendente').length;
+
+    if (pendentes > 0) {
+        alert(`Ainda existem ${pendentes} unidade(s) pendente(s). Marque OK ou NÃO OK antes de finalizar.`);
+        return;
+    }
+
+    const confirmar = confirm(`Finalizar conferência do pedido ${pedido.pedidoNumero}?`);
+    if (!confirmar) return;
+
+    pedido.status = 'finalizado';
+    pedido.finalizadoPor = document.getElementById('user-display')?.innerText || usuarioLogado?.id || 'SEM USUARIO';
+    pedido.finalizadoEm = new Date().toLocaleString('pt-BR');
+
+    salvarConferenciaSerra();
+    abrirPedidoConferenciaSerra(idPedido);
+}
 
