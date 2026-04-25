@@ -321,5 +321,36 @@ setTimeout(() => {
             console.error("Erro inicial Firebase:", erro);
         });
 }, 1500);
+async function atlasFirebaseAtualizarSemSair() {
+    try {
+        const snap = await getDoc(doc(atlasFirestore, "backups_localstorage", "ultimo_backup"));
+        if (!snap.exists()) return;
 
+        const dados = snap.data()?.dados || {};
+        const chaves = Object.keys(dados);
+
+        if (chaves.length === 0) return;
+
+        atlasFirebaseBloqueado = true;
+
+        chaves.forEach(chave => {
+            if (typeof dados[chave] === "string") {
+                localStorage.setItem(chave, dados[chave]);
+            }
+        });
+
+        atlasFirebaseBloqueado = false;
+
+        if (typeof usuarioLogado !== "undefined" && usuarioLogado) {
+            if (typeof aplicarPermissoesUsuario === "function") aplicarPermissoesUsuario();
+            if (typeof aplicarPreferenciasVisuaisUsuario === "function") aplicarPreferenciasVisuaisUsuario();
+        }
+    } catch (erro) {
+        console.error("Erro ao atualizar dados da nuvem:", erro);
+    }
+}
+
+setInterval(() => {
+    atlasFirebaseAtualizarSemSair();
+}, 15000);
 
