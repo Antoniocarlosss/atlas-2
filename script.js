@@ -5649,3 +5649,404 @@ document.addEventListener('click', function(evento) {
         janela.document.close();
     };
 })();
+/* ==========================================================
+   PESQUISAR ENCOMENDA / PEDIDO
+   Cole no FINAL do script.js
+   ========================================================== */
+
+(function() {
+    if (window.atlasPesquisaEncomendaAtiva) return;
+    window.atlasPesquisaEncomendaAtiva = true;
+
+    if (typeof MODULOS_SISTEMA !== 'undefined' && !MODULOS_SISTEMA.some(m => m.chave === 'pesquisa_encomenda')) {
+        MODULOS_SISTEMA.push({ chave: 'pesquisa_encomenda', nome: 'Pesquisar' });
+    }
+
+    function atlasTextoSeguro(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function atlasPedidoDescSerra(desc) {
+        const match = String(desc || '').match(/PED:\s*(.+)/i);
+        return match ? match[1].trim() : '';
+    }
+
+    function atlasGarantirCardPesquisaEncomenda() {
+        const grid = document.getElementById('grid-home');
+        if (!grid || document.getElementById('card-pesquisa-encomenda')) return;
+
+        const card = document.createElement('div');
+        card.id = 'card-pesquisa-encomenda';
+        card.className = 'card';
+        card.setAttribute('onclick', "abrirModulo('pesquisa_encomenda')");
+        card.innerHTML = `
+            <i class="fas fa-search"></i>
+            <span>Pesquisar</span>
+        `;
+
+        grid.appendChild(card);
+    }
+
+    const aplicarPreferenciasOriginalPesquisa = window.aplicarPreferenciasVisuaisUsuario;
+    window.aplicarPreferenciasVisuaisUsuario = function() {
+        if (typeof aplicarPreferenciasOriginalPesquisa === 'function') {
+            aplicarPreferenciasOriginalPesquisa();
+        }
+
+        atlasGarantirCardPesquisaEncomenda();
+
+        const card = document.getElementById('card-pesquisa-encomenda');
+        if (card) card.style.display = '';
+    };
+
+    const abrirModuloOriginalPesquisa = window.abrirModulo;
+    window.abrirModulo = function(nome) {
+        if (nome === 'pesquisa_encomenda') {
+            document.getElementById('grid-home').style.display = 'none';
+            document.getElementById('conteudo-modulo').style.display = 'block';
+            document.getElementById('titulo-modulo').innerText = 'PESQUISAR ENCOMENDA';
+            renderizarPesquisaEncomendaAtlas();
+            return;
+        }
+
+        abrirModuloOriginalPesquisa(nome);
+    };
+
+    setTimeout(atlasGarantirCardPesquisaEncomenda, 300);
+
+    window.renderizarPesquisaEncomendaAtlas = function() {
+        const render = document.getElementById('render-modulo');
+        if (!render) return;
+
+        render.innerHTML = `
+            <div style="padding:15px; color:white;">
+                <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:18px; margin-bottom:15px;">
+                    <label style="color:#94a3b8; font-size:12px; font-weight:bold;">NÚMERO DA ENCOMENDA / PEDIDO</label>
+                    <div style="display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:8px;">
+                        <input id="pesquisa-encomenda-input" type="text" placeholder="Ex: 12345"
+                            onkeydown="if(event.key === 'Enter') pesquisarEncomendaAtlas()"
+                            style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+                        <button onclick="pesquisarEncomendaAtlas()"
+                            style="background:#10b981; color:white; border:none; padding:0 18px; border-radius:8px; font-weight:bold;">
+                            BUSCAR
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultado-pesquisa-encomenda"></div>
+            </div>
+        `;
+    };
+
+    function buscarNoPlano(numero) {
+        const resultados = [];
+        const historico = JSON.parse(localStorage.getItem('atlas_plano_hist')) || [];
+
+        historico.forEach((rel, indexPlano) => {
+            const itens = (rel.itens || []).filter(item =>
+                item.modo === 'pedido' &&
+                String(item.pedidoNumero || '').toLowerCase().includes(numero)
+            );
+
+            const grupos = {};
+
+            itens.forEach(item => {
+                const chave = `${item.pedidoNumero || 'S/N'}|||${item.destino || 'SEM CLIENTE'}`;
+                if (!grupos[chave]) grupos[chave] = [];
+                grupos[chave].push(item);
+            });
+
+            Object.keys(grupos).forEach(chave => {
+                const [pedidoNumero, destino] = chave.split('|||');
+                resultados.push({
+                    origem: 'plano',
+                    indexPlano,
+                    rel,
+                    pedidoNumero,
+                    destino,
+                    itens: grupos[chave]
+                });
+            });
+        });
+
+        return resultados;
+    }
+
+    function buscarNaSerra(numero) {
+        const historico = JSON.parse(localStorage.getItem('atlas_serra_hist')) || [];
+        const resultados = [];
+
+        historico.forEach(rel => {
+            const itens = (rel.itens || []).filter(item =>
+                atlasPedidoDescSerra(item.desc).toLowerCase().includes(numero)
+            );
+
+            if (itens.length > 0) {
+                resultados.push({ rel, itens });
+            }
+        });
+
+        return resultados;
+    }
+
+    function buscarNaConferencia(numero) {
+        const conf = JSON.parse(localStorage.getItem('atlas_conferencia_serra')) || [];
+
+        return conf.filter(pedido =>
+            String(pedido.pedidoNumero || '').toLowerCase().includes(numero)
+        );
+    }
+
+    function calcularStatusPedido(plano, serra, conferencias) {
+        const itensPlano = plano?.itens || [];
+        const todosCancelados = itensPlano.length > 0 && itensPlano.every(i => i.encomendaCancelada === true);
+        const algunsCancelados = itensPlano.some(i => i.encomendaCancelada === true);
+
+        if (todosCancelados) {
+            return {
+                texto: 'CANCELADA',
+                cor: '#ef4444',
+                detalhe: 'Esta encomenda foi marcada como cancelada no Plano.'
+            };
+        }
+
+        const confFinalizada = conferencias.some(c => c.status === 'finalizado');
+        const confAberta = conferencias.some(c => c.status !== 'finalizado');
+
+        if (confAberta) {
+            return {
+                texto: 'FALTA CONFERIR',
+                cor: '#f59e0b',
+                detalhe: 'A encomenda já saiu da Serra, mas ainda falta finalizar a conferência.'
+            };
+        }
+
+        if (confFinalizada) {
+            const temNaoOk = conferencias.some(c => (c.unidades || []).some(u => u.status === 'nao'));
+
+            return {
+                texto: temNaoOk ? 'CONFERIDA COM PENDÊNCIA' : 'CONFERIDA OK',
+                cor: temNaoOk ? '#f59e0b' : '#10b981',
+                detalhe: temNaoOk
+                    ? 'A conferência foi finalizada, mas existe pelo menos uma unidade marcada como NÃO OK.'
+                    : 'A encomenda foi feita e conferida.'
+            };
+        }
+
+        if (serra.length > 0) {
+            return {
+                texto: 'FEITA NA SERRA',
+                cor: '#3b82f6',
+                detalhe: 'A encomenda aparece no histórico da Serra, mas não tem conferência finalizada.'
+            };
+        }
+
+        if (itensPlano.length > 0) {
+            return {
+                texto: algunsCancelados ? 'PARCIALMENTE CANCELADA' : 'AINDA NÃO FEITA',
+                cor: algunsCancelados ? '#f59e0b' : '#94a3b8',
+                detalhe: algunsCancelados
+                    ? 'Parte da encomenda foi cancelada, mas ainda existem itens ativos.'
+                    : 'A encomenda está no Plano, mas ainda não aparece como feita na Serra.'
+            };
+        }
+
+        return {
+            texto: 'NÃO ENCONTRADA',
+            cor: '#64748b',
+            detalhe: 'Não foi encontrado registro desta encomenda.'
+        };
+    }
+
+    function montarHTMLResultado(plano, serra, conferencias) {
+        const status = calcularStatusPedido(plano, serra, conferencias);
+        const itensAtivos = (plano?.itens || []).filter(i => i.encomendaCancelada !== true);
+        const itensCancelados = (plano?.itens || []).filter(i => i.encomendaCancelada === true);
+
+        const totalAtivo = itensAtivos.reduce((acc, item) => acc + Number(item.totalMetros || 0), 0);
+        const totalCancelado = itensCancelados.reduce((acc, item) => acc + Number(item.totalMetrosAntesCancelamento || item.totalMetros || 0), 0);
+
+        let html = `
+            <div style="background:#111827; border:1px solid #334155; border-radius:12px; overflow:hidden; margin-bottom:14px;">
+                <div style="background:#1e293b; padding:14px; border-left:6px solid ${status.cor};">
+                    <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+                        <div>
+                            <div style="font-size:18px; font-weight:bold; color:white;">
+                                PEDIDO ${atlasTextoSeguro(plano?.pedidoNumero || conferencias[0]?.pedidoNumero || '')}
+                            </div>
+                            <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                                Cliente: <b style="color:white;">${atlasTextoSeguro(plano?.destino || '-')}</b>
+                            </div>
+                        </div>
+
+                        <span style="background:${status.cor}; color:white; padding:7px 10px; border-radius:8px; font-size:12px; font-weight:bold;">
+                            ${status.texto}
+                        </span>
+                    </div>
+
+                    <div style="color:#cbd5e1; font-size:12px; margin-top:10px;">
+                        ${status.detalhe}
+                    </div>
+                </div>
+
+                <div style="padding:14px;">
+        `;
+
+        if (plano) {
+            html += `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+                    <div style="background:#0f172a; padding:10px; border-radius:8px;">
+                        <div style="color:#94a3b8; font-size:11px;">DATA DO PLANO</div>
+                        <b>${atlasTextoSeguro(plano.rel.data || '-')}</b>
+                    </div>
+                    <div style="background:#0f172a; padding:10px; border-radius:8px;">
+                        <div style="color:#94a3b8; font-size:11px;">METROS ATIVOS</div>
+                        <b style="color:#10b981;">${totalAtivo.toFixed(2)} m</b>
+                    </div>
+                </div>
+            `;
+
+            html += `
+                <h3 style="font-size:14px; margin:0 0 8px 0; color:white;">Itens do Pedido</h3>
+                ${(plano.itens || []).map(item => `
+                    <div style="background:${item.encomendaCancelada ? '#450a0a' : '#0f172a'}; border:1px solid ${item.encomendaCancelada ? '#ef4444' : '#334155'}; border-radius:8px; padding:10px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                            <b>${atlasTextoSeguro(item.tipo)} ${atlasTextoSeguro(item.espessura)} mm</b>
+                            <span style="color:${item.encomendaCancelada ? '#fca5a5' : '#10b981'}; font-weight:bold;">
+                                ${item.encomendaCancelada ? 'CANCELADO' : Number(item.totalMetros || 0).toFixed(2) + ' m'}
+                            </span>
+                        </div>
+                        <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                            RAL ${atlasTextoSeguro(item.ralInferior)}/${atlasTextoSeguro(item.ralSuperior)}<br>
+                            ${atlasTextoSeguro(item.quantidadeChapas)} chapas x ${atlasTextoSeguro(item.metrosUnidade)} m
+                            ${item.encomendaCancelada ? `
+                                <br><b style="color:#fca5a5;">Motivo:</b> ${atlasTextoSeguro(item.motivoCancelamento || '-')}
+                                <br><b style="color:#fca5a5;">Cancelado por:</b> ${atlasTextoSeguro(item.canceladoPor || '-')} em ${atlasTextoSeguro(item.canceladoEm || '-')}
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+
+            if (totalCancelado > 0) {
+                html += `
+                    <div style="background:#450a0a; border:1px solid #ef4444; border-radius:8px; padding:10px; color:#fca5a5; font-size:12px; margin-top:8px;">
+                        Total cancelado: <b>${totalCancelado.toFixed(2)} m</b>
+                    </div>
+                `;
+            }
+        }
+
+        if (serra.length > 0) {
+            html += `
+                <h3 style="font-size:14px; margin:18px 0 8px 0; color:white;">Serra</h3>
+                ${serra.map(reg => `
+                    <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
+                        <b>Data: ${atlasTextoSeguro(reg.rel.data)}</b><br>
+                        <small style="color:#94a3b8;">Operador: ${atlasTextoSeguro(reg.rel.operador || '-')}</small>
+                        ${(reg.itens || []).map(item => `
+                            <div style="margin-top:8px; color:#cbd5e1; font-size:12px;">
+                                ${atlasTextoSeguro(item.tipo)} ${atlasTextoSeguro(item.esp)} mm -
+                                ${Number(item.metros || 0).toFixed(2)} m -
+                                RAL ${atlasTextoSeguro(item.ralI)}/${atlasTextoSeguro(item.ralS)}
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        if (conferencias.length > 0) {
+            html += `
+                <h3 style="font-size:14px; margin:18px 0 8px 0; color:white;">Conferência</h3>
+                ${conferencias.map(conf => {
+                    const ok = (conf.unidades || []).filter(u => u.status === 'ok').length;
+                    const nao = (conf.unidades || []).filter(u => u.status === 'nao').length;
+                    const pendente = (conf.unidades || []).filter(u => u.status === 'pendente').length;
+
+                    return `
+                        <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                                <b>${conf.status === 'finalizado' ? 'Finalizada' : 'Em aberto'}</b>
+                                <span style="color:${conf.status === 'finalizado' ? '#10b981' : '#f59e0b'}; font-weight:bold;">
+                                    ${conf.status === 'finalizado' ? 'OK' : 'FALTA CONFERIR'}
+                                </span>
+                            </div>
+                            <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                                OK: ${ok} | NÃO OK: ${nao} | Pendentes: ${pendente}<br>
+                                Finalizado por: ${atlasTextoSeguro(conf.finalizadoPor || '-')}<br>
+                                Finalizado em: ${atlasTextoSeguro(conf.finalizadoEm || '-')}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+        }
+
+        html += `
+                </div>
+            </div>
+        `;
+
+        return html;
+    }
+
+    window.pesquisarEncomendaAtlas = function() {
+        const input = document.getElementById('pesquisa-encomenda-input');
+        const resultado = document.getElementById('resultado-pesquisa-encomenda');
+
+        if (!input || !resultado) return;
+
+        const numero = input.value.trim().toLowerCase();
+
+        if (!numero) {
+            alert('Digite o número da encomenda.');
+            return;
+        }
+
+        const planos = buscarNoPlano(numero);
+        const serra = buscarNaSerra(numero);
+        const conferencias = buscarNaConferencia(numero);
+
+        if (planos.length === 0 && serra.length === 0 && conferencias.length === 0) {
+            resultado.innerHTML = `
+                <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:20px; text-align:center; color:#94a3b8;">
+                    Nenhuma encomenda encontrada com este número.
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+
+        if (planos.length > 0) {
+            planos.forEach(plano => {
+                const serraPedido = serra.filter(reg =>
+                    (reg.itens || []).some(item => atlasPedidoDescSerra(item.desc) === plano.pedidoNumero)
+                );
+
+                const confPedido = conferencias.filter(conf =>
+                    String(conf.pedidoNumero) === String(plano.pedidoNumero)
+                );
+
+                html += montarHTMLResultado(plano, serraPedido, confPedido);
+            });
+        } else {
+            conferencias.forEach(conf => {
+                const serraPedido = serra.filter(reg =>
+                    (reg.itens || []).some(item => atlasPedidoDescSerra(item.desc) === conf.pedidoNumero)
+                );
+
+                html += montarHTMLResultado(null, serraPedido, [conf]);
+            });
+        }
+
+        resultado.innerHTML = html;
+    };
+})();
+
