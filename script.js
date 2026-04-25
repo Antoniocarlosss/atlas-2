@@ -3825,4 +3825,1059 @@ function aplicarTemaUsuario(tema) {
         grid.style.background = tema === 'claro' ? '#f3f6fb' : '';
     }
 }
+/* ==========================================================
+   PLANO - REMOVER PEDIDO/CLIENTE CANCELADO DO HISTÓRICO
+   Cole no FINAL do script.js
+   ========================================================== */
+
+function usuarioPodeEditarPlanoHistorico() {
+    return usuarioLogado && (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor');
+}
+
+function recalcularPlanoHistorico(rel) {
+    rel.totalGeral = Number((rel.itens || []).reduce((acc, item) => acc + Number(item.totalMetros || 0), 0).toFixed(2));
+    rel.resumo = gerarResumoPlano(rel.itens || []);
+    rel.tiposLancamento = Array.from(new Set((rel.itens || []).map(x => x.modo)));
+    return rel;
+}
+
+function salvarPlanoHistoricoEditado(index, rel) {
+    db_plano_hist[index] = recalcularPlanoHistorico(rel);
+    localStorage.setItem('atlas_plano_hist', JSON.stringify(db_plano_hist));
+}
+
+function abrirGestaoPlanoHistorico(index) {
+    if (!usuarioPodeEditarPlanoHistorico()) {
+        alert('Apenas ADMIN ou SUPERVISOR podem gerir planos do histórico.');
+        return;
+    }
+
+    const rel = db_plano_hist[index];
+    if (!rel) return alert('Plano não encontrado.');
+
+    if (!document.getElementById('modal-plano-historico')) {
+        const modal = document.createElement('div');
+        modal.id = 'modal-plano-historico';
+        modal.style = 'display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:10000; padding:12px; overflow:auto;';
+        document.body.appendChild(modal);
+    }
+
+    renderizarGestaoPlanoHistorico(index);
+}
+
+function fecharGestaoPlanoHistorico() {
+    const modal = document.getElementById('modal-plano-historico');
+    if (modal) modal.style.display = 'none';
+}
+
+function removerItemPlanoHistorico(indexPlano, idItem) {
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const item = rel.itens.find(i => String(i.id) === String(idItem));
+    if (!item) return;
+
+    const confirmar = confirm(`Remover este item?\n\n${item.descricao || item.pedidoNumero || 'ITEM'}\n${item.destino || ''}\n${item.totalMetros || 0} m`);
+    if (!confirmar) return;
+
+    rel.itens = rel.itens.filter(i => String(i.id) !== String(idItem));
+
+    if (rel.itens.length === 0) {
+        const apagarPlano = confirm('Este era o último item do plano. Deseja apagar o plano inteiro do histórico?');
+        if (apagarPlano) {
+            db_plano_hist.splice(indexPlano, 1);
+            localStorage.setItem('atlas_plano_hist', JSON.stringify(db_plano_hist));
+            fecharGestaoPlanoHistorico();
+            listarHistoricoPlano();
+            return;
+        }
+    }
+
+    salvarPlanoHistoricoEditado(indexPlano, rel);
+    renderizarGestaoPlanoHistorico(indexPlano);
+    listarHistoricoPlano();
+}
+
+function removerPedidoPlanoHistorico(indexPlano, pedidoNumero, destino) {
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const confirmar = confirm(`Remover o pedido inteiro?\n\nPedido: ${pedidoNumero}\nCliente: ${destino}`);
+    if (!confirmar) return;
+
+    rel.itens = rel.itens.filter(item => {
+        return !(item.modo === 'pedido' && String(item.pedidoNumero) === String(pedidoNumero) && String(item.destino) === String(destino));
+    });
+
+    if (rel.itens.length === 0) {
+        const apagarPlano = confirm('Este era o último pedido do plano. Deseja apagar o plano inteiro do histórico?');
+        if (apagarPlano) {
+            db_plano_hist.splice(indexPlano, 1);
+            localStorage.setItem('atlas_plano_hist', JSON.stringify(db_plano_hist));
+            fecharGestaoPlanoHistorico();
+            listarHistoricoPlano();
+            return;
+        }
+    }
+
+    salvarPlanoHistoricoEditado(indexPlano, rel);
+    renderizarGestaoPlanoHistorico(indexPlano);
+    listarHistoricoPlano();
+}
+
+function renderizarGestaoPlanoHistorico(indexPlano) {
+    const rel = db_plano_hist[indexPlano];
+    const modal = document.getElementById('modal-plano-historico');
+    if (!rel || !modal) return;
+
+    const pedidos = {};
+    const stock = [];
+
+    (rel.itens || []).forEach(item => {
+        if (item.modo === 'pedido') {
+            const chave = `${item.pedidoNumero || 'S/N'}|||${item.destino || 'SEM CLIENTE'}`;
+            if (!pedidos[chave]) pedidos[chave] = [];
+            pedidos[chave].push(item);
+        } else {
+            stock.push(item);
+        }
+    });
+
+    let htmlPedidos = '';
+
+    Object.keys(pedidos).forEach(chave => {
+        const [pedidoNumero, destino] = chave.split('|||');
+        const itens = pedidos[chave];
+        const totalPedido = itens.reduce((acc, item) => acc + Number(item.totalMetros || 0), 0);
+
+        htmlPedidos += `
+            <div style="background:#111827; border:1px solid #334155; border-radius:10px; margin-bottom:12px; overflow:hidden;">
+                <div style="padding:12px; background:#1e293b; border-bottom:1px solid #334155;">
+                    <div style="color:white; font-weight:bold; font-size:14px;">PEDIDO ${pedidoNumero}</div>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:3px;">Cliente: ${destino}</div>
+                    <div style="color:#10b981; font-size:12px; margin-top:3px; font-weight:bold;">Total: ${totalPedido.toFixed(2)} m</div>
+
+                    <button onclick="removerPedidoPlanoHistorico(${indexPlano}, '${String(pedidoNumero).replace(/'/g, "\\'")}', '${String(destino).replace(/'/g, "\\'")}')" 
+                        style="margin-top:10px; width:100%; background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">
+                        REMOVER PEDIDO INTEIRO
+                    </button>
+                </div>
+
+                <div style="padding:10px;">
+                    ${itens.map(item => `
+                        <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
+                            <div style="color:white; font-size:13px; font-weight:bold;">
+                                ${item.tipo} ${item.espessura} mm
+                            </div>
+                            <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                                RAL ${item.ralInferior}/${item.ralSuperior}<br>
+                                ${item.quantidadeChapas} chapas x ${item.metrosUnidade} m = <b style="color:#10b981;">${Number(item.totalMetros || 0).toFixed(2)} m</b>
+                            </div>
+                            <button onclick="removerItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                                style="margin-top:8px; width:100%; background:#7f1d1d; color:white; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                                REMOVER SÓ ESTE ITEM
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    let htmlStock = '';
+
+    if (stock.length > 0) {
+        htmlStock = `
+            <h3 style="color:white; font-size:14px; margin:18px 0 10px 0;">STOCK</h3>
+            ${stock.map(item => `
+                <div style="background:#111827; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:10px;">
+                    <div style="color:white; font-weight:bold; font-size:13px;">
+                        ${item.tipo} ${item.espessura} mm - ${item.qualidade || 'STOCK'}
+                    </div>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                        RAL ${item.ralInferior}/${item.ralSuperior}<br>
+                        ${item.quantidadeChapas} chapas x ${item.metrosUnidade} m = <b style="color:#10b981;">${Number(item.totalMetros || 0).toFixed(2)} m</b>
+                    </div>
+                    <button onclick="removerItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                        style="margin-top:8px; width:100%; background:#7f1d1d; color:white; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                        REMOVER ITEM
+                    </button>
+                </div>
+            `).join('')}
+        `;
+    }
+
+    modal.innerHTML = `
+        <div style="max-width:720px; margin:0 auto; background:#020617; min-height:100%; border-radius:14px; border:1px solid #334155; padding:14px;">
+            <div style="position:sticky; top:0; background:#020617; padding-bottom:12px; border-bottom:1px solid #334155; z-index:2;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <div>
+                        <h2 style="color:white; margin:0; font-size:18px;">Gerir Plano</h2>
+                        <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                            ${rel.data} | Total atual: <b style="color:#10b981;">${Number(rel.totalGeral || 0).toFixed(2)} m</b>
+                        </div>
+                    </div>
+                    <button onclick="fecharGestaoPlanoHistorico()" style="background:#475569; color:white; border:none; padding:10px 12px; border-radius:8px; font-weight:bold;">
+                        FECHAR
+                    </button>
+                </div>
+            </div>
+
+            <div style="padding-top:14px;">
+                ${htmlPedidos || `<div style="text-align:center; color:#94a3b8; padding:20px;">Nenhum pedido neste plano.</div>`}
+                ${htmlStock}
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'block';
+}
+
+function listarHistoricoPlano() {
+    if (!alternarAbaPlano(true)) return;
+
+    const c = document.getElementById('container-acao-plano');
+    const agrupado = {};
+
+    db_plano_hist.forEach((rel, index) => {
+        agrupado[rel.ano] ||= {};
+        agrupado[rel.ano][rel.mes] ||= {};
+        agrupado[rel.ano][rel.mes][rel.dia] ||= [];
+        agrupado[rel.ano][rel.mes][rel.dia].push({ rel, index });
+    });
+
+    let html = `
+        <div style="color:white;">
+            <div style="display:flex; align-items:center; margin-bottom:20px;">
+                <button onclick="alternarAbaPlano(false)" style="background:none; border:none; color:#94a3b8; font-size:20px; cursor:pointer; margin-right:15px;">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2 style="border-bottom:2px solid #E31C24; padding-bottom:10px; margin:0; flex:1; font-size:18px; text-transform:uppercase;">
+                    Histórico de Planos
+                </h2>
+            </div>
+    `;
+
+    if (db_plano_hist.length === 0) {
+        html += `<div style="text-align:center; padding:50px; color:gray;">Nenhum plano encontrado.</div>`;
+    }
+
+    Object.keys(agrupado).sort((a,b)=>b-a).forEach(ano => {
+        html += `
+            <div style="margin-bottom:10px;">
+                <div onclick="togglePlanoElemento('ano-plano-${ano}')" style="background:#1e293b; padding:12px; border-radius:5px; font-weight:bold; cursor:pointer; border:1px solid #334155; display:flex; justify-content:space-between;">
+                    <span>ANO ${ano}</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div id="ano-plano-${ano}" style="display:none; padding-left:10px; margin-top:5px; border-left:2px solid #E31C24;">
+        `;
+
+        Object.keys(agrupado[ano]).sort((a,b)=>b-a).forEach(mes => {
+            html += `
+                <div onclick="togglePlanoElemento('mes-plano-${ano}-${mes}')" style="cursor:pointer; padding:10px; color:#3b82f6; background:#0f172a; margin-top:5px; border-radius:4px; font-weight:bold;">
+                    ${MESES_PT[mes] || mes}
+                </div>
+                <div id="mes-plano-${ano}-${mes}" style="display:none; padding-left:10px; background:#1a202c;">
+            `;
+
+            Object.keys(agrupado[ano][mes]).sort((a,b)=>b-a).forEach(dia => {
+                html += `
+                    <div onclick="togglePlanoElemento('dia-plano-${ano}-${mes}-${dia}')" style="cursor:pointer; padding:10px; color:white; border-bottom:1px solid #334155;">
+                        DIA ${dia}/${String(mes).padStart(2,'0')}
+                    </div>
+                    <div id="dia-plano-${ano}-${mes}-${dia}" style="display:none; padding:8px 0 8px 10px;">
+                `;
+
+                agrupado[ano][mes][dia].forEach(({ rel, index }) => {
+                    html += `
+                        <div style="background:#111827; border:1px solid #334155; border-radius:8px; padding:12px; margin-bottom:10px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <span style="font-size:13px;">
+                                    <b style="color:white;">${rel.data}</b><br>
+                                    <small style="color:#94a3b8;">${Number(rel.totalGeral || 0).toFixed(2)} m</small>
+                                </span>
+
+                                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    ${usuarioPodeEditarPlanoHistorico() ? `
+                                        <button onclick="abrirGestaoPlanoHistorico(${index})" style="background:#f59e0b; color:black; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:11px;">
+                                            GERIR
+                                        </button>
+                                    ` : ''}
+
+                                    <button onclick='gerarPDF_Plano("${encodeURIComponent(JSON.stringify(rel)).replace(/'/g, '%27')}")' style="background:#10b981; color:white; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; font-weight:bold; font-size:11px;">
+                                        PDF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+            });
+
+            html += `</div>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    c.innerHTML = html + `</div>`;
+}
+/* ==========================================================
+   PLANO - EDITAR ITEM + REGISTRO DE QUEM EDITOU
+   Cole DEPOIS do bloco anterior do Plano
+   ========================================================== */
+
+function obterNomeEditorPlano() {
+    return document.getElementById('user-display')?.innerText || usuarioLogado?.id || 'SEM USUARIO';
+}
+
+function registrarEdicaoPlanoHistorico(rel, acao) {
+    const registro = {
+        usuario: obterNomeEditorPlano(),
+        dataHora: new Date().toLocaleString('pt-BR'),
+        acao: acao
+    };
+
+    if (!Array.isArray(rel.historicoEdicoes)) {
+        rel.historicoEdicoes = [];
+    }
+
+    rel.historicoEdicoes.push(registro);
+    rel.editadoPor = registro.usuario;
+    rel.editadoEm = registro.dataHora;
+}
+
+function salvarPlanoHistoricoEditado(index, rel, acao) {
+    registrarEdicaoPlanoHistorico(rel, acao || 'Alteracao no plano');
+    db_plano_hist[index] = recalcularPlanoHistorico(rel);
+    localStorage.setItem('atlas_plano_hist', JSON.stringify(db_plano_hist));
+}
+
+function abrirEdicaoItemPlanoHistorico(indexPlano, idItem) {
+    if (!usuarioPodeEditarPlanoHistorico()) {
+        alert('Apenas ADMIN ou SUPERVISOR podem editar planos do histórico.');
+        return;
+    }
+
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const item = rel.itens.find(i => String(i.id) === String(idItem));
+    if (!item) return alert('Item não encontrado.');
+
+    const modal = document.getElementById('modal-plano-historico');
+    if (!modal) return;
+
+    modal.innerHTML = `
+        <div style="max-width:520px; margin:0 auto; background:#020617; min-height:100%; border-radius:14px; border:1px solid #334155; padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #334155; padding-bottom:12px;">
+                <div>
+                    <h2 style="color:white; margin:0; font-size:18px;">Editar Item</h2>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                        ${item.pedidoNumero ? 'Pedido ' + item.pedidoNumero : 'Stock'} ${item.destino ? '| ' + item.destino : ''}
+                    </div>
+                </div>
+                <button onclick="renderizarGestaoPlanoHistorico(${indexPlano})" style="background:#475569; color:white; border:none; padding:10px 12px; border-radius:8px; font-weight:bold;">
+                    VOLTAR
+                </button>
+            </div>
+
+            <div style="padding-top:15px;">
+                <div style="background:#111827; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:15px;">
+                    <div style="color:white; font-weight:bold; font-size:14px;">
+                        ${item.tipo} ${item.espessura} mm
+                    </div>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                        RAL ${item.ralInferior}/${item.ralSuperior}
+                    </div>
+                </div>
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">QUANTIDADE DE CHAPAS</label>
+                <input type="number" id="edit-plano-qtd" value="${item.quantidadeChapas || 1}"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">METROS POR CHAPA</label>
+                <input type="number" step="0.01" id="edit-plano-metros" value="${item.metrosUnidade || 0}"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <button onclick="salvarEdicaoItemPlanoHistorico(${indexPlano}, '${String(idItem).replace(/'/g, "\\'")}')"
+                    style="width:100%; background:#10b981; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; font-size:14px;">
+                    SALVAR ALTERAÇÃO
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function salvarEdicaoItemPlanoHistorico(indexPlano, idItem) {
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const item = rel.itens.find(i => String(i.id) === String(idItem));
+    if (!item) return;
+
+    const qtd = Number(document.getElementById('edit-plano-qtd')?.value);
+    const metros = Number(document.getElementById('edit-plano-metros')?.value);
+
+    if (!qtd || qtd <= 0) return alert('Informe uma quantidade válida.');
+    if (!metros || metros <= 0) return alert('Informe os metros válidos.');
+
+    item.quantidadeChapas = qtd;
+    item.metrosUnidade = metros;
+    item.totalMetros = Number((qtd * metros).toFixed(2));
+
+    salvarPlanoHistoricoEditado(
+        indexPlano,
+        rel,
+        `Editou item ${item.pedidoNumero ? 'do pedido ' + item.pedidoNumero : 'de stock'}: ${qtd} chapas x ${metros} m`
+    );
+
+    renderizarGestaoPlanoHistorico(indexPlano);
+    listarHistoricoPlano();
+}
+
+function removerItemPlanoHistorico(indexPlano, idItem) {
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const item = rel.itens.find(i => String(i.id) === String(idItem));
+    if (!item) return;
+
+    const confirmar = confirm(`Remover este item?\n\n${item.descricao || item.pedidoNumero || 'ITEM'}\n${item.destino || ''}\n${item.totalMetros || 0} m`);
+    if (!confirmar) return;
+
+    rel.itens = rel.itens.filter(i => String(i.id) !== String(idItem));
+
+    if (rel.itens.length === 0) {
+        const apagarPlano = confirm('Este era o último item do plano. Deseja apagar o plano inteiro do histórico?');
+        if (apagarPlano) {
+            db_plano_hist.splice(indexPlano, 1);
+            localStorage.setItem('atlas_plano_hist', JSON.stringify(db_plano_hist));
+            fecharGestaoPlanoHistorico();
+            listarHistoricoPlano();
+            return;
+        }
+    }
+
+    salvarPlanoHistoricoEditado(indexPlano, rel, `Removeu item ${item.pedidoNumero ? 'do pedido ' + item.pedidoNumero : 'de stock'}`);
+    renderizarGestaoPlanoHistorico(indexPlano);
+    listarHistoricoPlano();
+}
+
+function removerPedidoPlanoHistorico(indexPlano, pedidoNumero, destino) {
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const confirmar = confirm(`Remover o pedido inteiro?\n\nPedido: ${pedidoNumero}\nCliente: ${destino}`);
+    if (!confirmar) return;
+
+    rel.itens = rel.itens.filter(item => {
+        return !(item.modo === 'pedido' && String(item.pedidoNumero) === String(pedidoNumero) && String(item.destino) === String(destino));
+    });
+
+    if (rel.itens.length === 0) {
+        const apagarPlano = confirm('Este era o último pedido do plano. Deseja apagar o plano inteiro do histórico?');
+        if (apagarPlano) {
+            db_plano_hist.splice(indexPlano, 1);
+            localStorage.setItem('atlas_plano_hist', JSON.stringify(db_plano_hist));
+            fecharGestaoPlanoHistorico();
+            listarHistoricoPlano();
+            return;
+        }
+    }
+
+    salvarPlanoHistoricoEditado(indexPlano, rel, `Removeu pedido ${pedidoNumero} - ${destino}`);
+    renderizarGestaoPlanoHistorico(indexPlano);
+    listarHistoricoPlano();
+}
+
+function renderizarGestaoPlanoHistorico(indexPlano) {
+    const rel = db_plano_hist[indexPlano];
+    const modal = document.getElementById('modal-plano-historico');
+    if (!rel || !modal) return;
+
+    const pedidos = {};
+    const stock = [];
+
+    (rel.itens || []).forEach(item => {
+        if (item.modo === 'pedido') {
+            const chave = `${item.pedidoNumero || 'S/N'}|||${item.destino || 'SEM CLIENTE'}`;
+            if (!pedidos[chave]) pedidos[chave] = [];
+            pedidos[chave].push(item);
+        } else {
+            stock.push(item);
+        }
+    });
+
+    let infoEdicao = '';
+    if (rel.editadoPor && rel.editadoEm) {
+        infoEdicao = `
+            <div style="margin-top:8px; background:#1e293b; border:1px solid #334155; color:#facc15; padding:8px; border-radius:8px; font-size:12px;">
+                Última edição: <b>${rel.editadoPor}</b> em <b>${rel.editadoEm}</b>
+            </div>
+        `;
+    }
+
+    let htmlPedidos = '';
+
+    Object.keys(pedidos).forEach(chave => {
+        const [pedidoNumero, destino] = chave.split('|||');
+        const itens = pedidos[chave];
+        const totalPedido = itens.reduce((acc, item) => acc + Number(item.totalMetros || 0), 0);
+
+        htmlPedidos += `
+            <div style="background:#111827; border:1px solid #334155; border-radius:10px; margin-bottom:12px; overflow:hidden;">
+                <div style="padding:12px; background:#1e293b; border-bottom:1px solid #334155;">
+                    <div style="color:white; font-weight:bold; font-size:14px;">PEDIDO ${pedidoNumero}</div>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:3px;">Cliente: ${destino}</div>
+                    <div style="color:#10b981; font-size:12px; margin-top:3px; font-weight:bold;">Total: ${totalPedido.toFixed(2)} m</div>
+
+                    <button onclick="removerPedidoPlanoHistorico(${indexPlano}, '${String(pedidoNumero).replace(/'/g, "\\'")}', '${String(destino).replace(/'/g, "\\'")}')" 
+                        style="margin-top:10px; width:100%; background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">
+                        REMOVER PEDIDO INTEIRO
+                    </button>
+                </div>
+
+                <div style="padding:10px;">
+                    ${itens.map(item => `
+                        <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
+                            <div style="color:white; font-size:13px; font-weight:bold;">
+                                ${item.tipo} ${item.espessura} mm
+                            </div>
+                            <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                                RAL ${item.ralInferior}/${item.ralSuperior}<br>
+                                ${item.quantidadeChapas} chapas x ${item.metrosUnidade} m =
+                                <b style="color:#10b981;">${Number(item.totalMetros || 0).toFixed(2)} m</b>
+                            </div>
+
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                                <button onclick="abrirEdicaoItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                                    style="background:#f59e0b; color:black; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                                    EDITAR ITEM
+                                </button>
+
+                                <button onclick="removerItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                                    style="background:#7f1d1d; color:white; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                                    REMOVER
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    let htmlStock = '';
+
+    if (stock.length > 0) {
+        htmlStock = `
+            <h3 style="color:white; font-size:14px; margin:18px 0 10px 0;">STOCK</h3>
+            ${stock.map(item => `
+                <div style="background:#111827; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:10px;">
+                    <div style="color:white; font-weight:bold; font-size:13px;">
+                        ${item.tipo} ${item.espessura} mm - ${item.qualidade || 'STOCK'}
+                    </div>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                        RAL ${item.ralInferior}/${item.ralSuperior}<br>
+                        ${item.quantidadeChapas} chapas x ${item.metrosUnidade} m =
+                        <b style="color:#10b981;">${Number(item.totalMetros || 0).toFixed(2)} m</b>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                        <button onclick="abrirEdicaoItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                            style="background:#f59e0b; color:black; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                            EDITAR ITEM
+                        </button>
+
+                        <button onclick="removerItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                            style="background:#7f1d1d; color:white; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                            REMOVER
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+    }
+
+    modal.innerHTML = `
+        <div style="max-width:720px; margin:0 auto; background:#020617; min-height:100%; border-radius:14px; border:1px solid #334155; padding:14px;">
+            <div style="position:sticky; top:0; background:#020617; padding-bottom:12px; border-bottom:1px solid #334155; z-index:2;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <div>
+                        <h2 style="color:white; margin:0; font-size:18px;">Gerir Plano</h2>
+                        <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                            ${rel.data} | Total atual:
+                            <b style="color:#10b981;">${Number(rel.totalGeral || 0).toFixed(2)} m</b>
+                        </div>
+                    </div>
+                    <button onclick="fecharGestaoPlanoHistorico()" style="background:#475569; color:white; border:none; padding:10px 12px; border-radius:8px; font-weight:bold;">
+                        FECHAR
+                    </button>
+                </div>
+                ${infoEdicao}
+            </div>
+
+            <div style="padding-top:14px;">
+                ${htmlPedidos || `<div style="text-align:center; color:#94a3b8; padding:20px;">Nenhum pedido neste plano.</div>`}
+                ${htmlStock}
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'block';
+}
+
+/* Mostra última edição no PDF do Plano */
+if (typeof montarHTMLPlano === 'function' && !window.montarHTMLPlanoOriginalComEdicao) {
+    window.montarHTMLPlanoOriginalComEdicao = montarHTMLPlano;
+
+    montarHTMLPlano = function(rel, comBotaoImpressao) {
+        let html = window.montarHTMLPlanoOriginalComEdicao(rel, comBotaoImpressao);
+
+        if (rel.editadoPor && rel.editadoEm) {
+            const blocoEdicao = `
+                <div style="margin-top:12px; background:#fff7ed; color:#000; padding:10px; border:2px solid #f59e0b; font-size:12px; font-weight:bold;">
+                    EDITADO POR: ${rel.editadoPor} | DATA/HORA: ${rel.editadoEm}
+                </div>
+            `;
+
+            html = html.replace('<div style="margin-top:20px;">', blocoEdicao + '<div style="margin-top:20px;">');
+        }
+
+        return html;
+    };
+}
+/* ==========================================================
+   PLANO - ADICIONAR MAIS ITENS AO PEDIDO NO HISTÓRICO
+   Cole no FINAL do script.js
+   ========================================================== */
+
+function abrirAdicionarItemPedidoPlanoHistorico(indexPlano, pedidoNumero, destino) {
+    if (!usuarioPodeEditarPlanoHistorico()) {
+        alert('Apenas ADMIN ou SUPERVISOR podem editar planos do histórico.');
+        return;
+    }
+
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return alert('Plano não encontrado.');
+
+    const modal = document.getElementById('modal-plano-historico');
+    if (!modal) return;
+
+    modal.innerHTML = `
+        <div style="max-width:520px; margin:0 auto; background:#020617; min-height:100%; border-radius:14px; border:1px solid #334155; padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #334155; padding-bottom:12px;">
+                <div>
+                    <h2 style="color:white; margin:0; font-size:18px;">Adicionar Item</h2>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                        Pedido ${pedidoNumero} | ${destino}
+                    </div>
+                </div>
+                <button onclick="renderizarGestaoPlanoHistorico(${indexPlano})" style="background:#475569; color:white; border:none; padding:10px 12px; border-radius:8px; font-weight:bold;">
+                    VOLTAR
+                </button>
+            </div>
+
+            <div style="padding-top:15px;">
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">TIPO DE CHAPA</label>
+                <select id="add-plano-tipo" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                    ${OPCOES_TIPO_PLANO.map(v => `<option value="${v}">${v}</option>`).join('')}
+                </select>
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">ESPESSURA</label>
+                <select id="add-plano-esp" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                    ${OPCOES_ESPESSURA_PLANO.map(v => `<option value="${v}">${v} mm</option>`).join('')}
+                </select>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label style="color:#94a3b8; font-size:12px; font-weight:bold;">RAL INFERIOR</label>
+                        <select id="add-plano-ral-inf" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                            ${OPCOES_RAL_INF.map(v => `<option value="${v}">${v}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="color:#94a3b8; font-size:12px; font-weight:bold;">RAL SUPERIOR</label>
+                        <select id="add-plano-ral-sup" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                            ${OPCOES_RAL_SUP.map(v => `<option value="${v}">${v}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">QUANTIDADE DE CHAPAS</label>
+                <input type="number" id="add-plano-qtd" value="1"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">METROS POR CHAPA</label>
+                <input type="number" step="0.01" id="add-plano-metros" placeholder="Ex: 6.50"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <button onclick="salvarNovoItemPedidoPlanoHistorico(${indexPlano}, '${String(pedidoNumero).replace(/'/g, "\\'")}', '${String(destino).replace(/'/g, "\\'")}')"
+                    style="width:100%; background:#10b981; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; font-size:14px;">
+                    ADICIONAR AO PEDIDO
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function salvarNovoItemPedidoPlanoHistorico(indexPlano, pedidoNumero, destino) {
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const tipo = document.getElementById('add-plano-tipo')?.value;
+    const espessura = document.getElementById('add-plano-esp')?.value;
+    const ralInferior = document.getElementById('add-plano-ral-inf')?.value;
+    const ralSuperior = document.getElementById('add-plano-ral-sup')?.value;
+    const qtd = Number(document.getElementById('add-plano-qtd')?.value);
+    const metros = Number(document.getElementById('add-plano-metros')?.value);
+
+    if (!tipo) return alert('Selecione o tipo de chapa.');
+    if (!espessura) return alert('Selecione a espessura.');
+    if (!qtd || qtd <= 0) return alert('Informe uma quantidade válida.');
+    if (!metros || metros <= 0) return alert('Informe os metros por chapa.');
+
+    const novoItem = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        modo: 'pedido',
+        tipo: tipo,
+        espessura: espessura,
+        ralSuperior: ralSuperior,
+        ralInferior: ralInferior,
+        quantidadeChapas: qtd,
+        metrosUnidade: metros,
+        totalMetros: Number((qtd * metros).toFixed(2)),
+        pedidoNumero: pedidoNumero,
+        destino: destino,
+        descricao: `PEDIDO ${pedidoNumero}`
+    };
+
+    if (!Array.isArray(rel.itens)) {
+        rel.itens = [];
+    }
+
+    rel.itens.push(novoItem);
+
+    salvarPlanoHistoricoEditado(
+        indexPlano,
+        rel,
+        `Adicionou item ao pedido ${pedidoNumero}: ${qtd} chapas x ${metros} m`
+    );
+
+    renderizarGestaoPlanoHistorico(indexPlano);
+    listarHistoricoPlano();
+}
+
+/* Substitui novamente a tela GERIR para mostrar o botão ADICIONAR ITEM AO PEDIDO */
+const renderizarGestaoPlanoHistoricoComEditar = renderizarGestaoPlanoHistorico;
+
+renderizarGestaoPlanoHistorico = function(indexPlano) {
+    const rel = db_plano_hist[indexPlano];
+    const modal = document.getElementById('modal-plano-historico');
+    if (!rel || !modal) return;
+
+    const pedidos = {};
+    const stock = [];
+
+    (rel.itens || []).forEach(item => {
+        if (item.modo === 'pedido') {
+            const chave = `${item.pedidoNumero || 'S/N'}|||${item.destino || 'SEM CLIENTE'}`;
+            if (!pedidos[chave]) pedidos[chave] = [];
+            pedidos[chave].push(item);
+        } else {
+            stock.push(item);
+        }
+    });
+
+    let infoEdicao = '';
+    if (rel.editadoPor && rel.editadoEm) {
+        infoEdicao = `
+            <div style="margin-top:8px; background:#1e293b; border:1px solid #334155; color:#facc15; padding:8px; border-radius:8px; font-size:12px;">
+                Última edição: <b>${rel.editadoPor}</b> em <b>${rel.editadoEm}</b>
+            </div>
+        `;
+    }
+
+    let htmlPedidos = '';
+
+    Object.keys(pedidos).forEach(chave => {
+        const [pedidoNumero, destino] = chave.split('|||');
+        const itens = pedidos[chave];
+        const totalPedido = itens.reduce((acc, item) => acc + Number(item.totalMetros || 0), 0);
+
+        htmlPedidos += `
+            <div style="background:#111827; border:1px solid #334155; border-radius:10px; margin-bottom:12px; overflow:hidden;">
+                <div style="padding:12px; background:#1e293b; border-bottom:1px solid #334155;">
+                    <div style="color:white; font-weight:bold; font-size:14px;">PEDIDO ${pedidoNumero}</div>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:3px;">Cliente: ${destino}</div>
+                    <div style="color:#10b981; font-size:12px; margin-top:3px; font-weight:bold;">Total: ${totalPedido.toFixed(2)} m</div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
+                        <button onclick="abrirAdicionarItemPedidoPlanoHistorico(${indexPlano}, '${String(pedidoNumero).replace(/'/g, "\\'")}', '${String(destino).replace(/'/g, "\\'")}')" 
+                            style="background:#10b981; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">
+                            ADICIONAR ITEM
+                        </button>
+
+                        <button onclick="removerPedidoPlanoHistorico(${indexPlano}, '${String(pedidoNumero).replace(/'/g, "\\'")}', '${String(destino).replace(/'/g, "\\'")}')" 
+                            style="background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">
+                            REMOVER PEDIDO
+                        </button>
+                    </div>
+                </div>
+
+                <div style="padding:10px;">
+                    ${itens.map(item => `
+                        <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
+                            <div style="color:white; font-size:13px; font-weight:bold;">
+                                ${item.tipo} ${item.espessura} mm
+                            </div>
+                            <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                                RAL ${item.ralInferior}/${item.ralSuperior}<br>
+                                ${item.quantidadeChapas} chapas x ${item.metrosUnidade} m =
+                                <b style="color:#10b981;">${Number(item.totalMetros || 0).toFixed(2)} m</b>
+                            </div>
+
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                                <button onclick="abrirEdicaoItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                                    style="background:#f59e0b; color:black; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                                    EDITAR ITEM
+                                </button>
+
+                                <button onclick="removerItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                                    style="background:#7f1d1d; color:white; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                                    REMOVER
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    let htmlStock = '';
+
+    if (stock.length > 0) {
+        htmlStock = `
+            <h3 style="color:white; font-size:14px; margin:18px 0 10px 0;">STOCK</h3>
+            ${stock.map(item => `
+                <div style="background:#111827; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:10px;">
+                    <div style="color:white; font-weight:bold; font-size:13px;">
+                        ${item.tipo} ${item.espessura} mm - ${item.qualidade || 'STOCK'}
+                    </div>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                        RAL ${item.ralInferior}/${item.ralSuperior}<br>
+                        ${item.quantidadeChapas} chapas x ${item.metrosUnidade} m =
+                        <b style="color:#10b981;">${Number(item.totalMetros || 0).toFixed(2)} m</b>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                        <button onclick="abrirEdicaoItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                            style="background:#f59e0b; color:black; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                            EDITAR ITEM
+                        </button>
+
+                        <button onclick="removerItemPlanoHistorico(${indexPlano}, '${item.id}')"
+                            style="background:#7f1d1d; color:white; border:none; padding:9px; border-radius:7px; font-weight:bold;">
+                            REMOVER
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+    }
+
+    modal.innerHTML = `
+        <div style="max-width:720px; margin:0 auto; background:#020617; min-height:100%; border-radius:14px; border:1px solid #334155; padding:14px;">
+            <div style="position:sticky; top:0; background:#020617; padding-bottom:12px; border-bottom:1px solid #334155; z-index:2;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <div>
+                        <h2 style="color:white; margin:0; font-size:18px;">Gerir Plano</h2>
+                        <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                            ${rel.data} | Total atual:
+                            <b style="color:#10b981;">${Number(rel.totalGeral || 0).toFixed(2)} m</b>
+                        </div>
+                    </div>
+                    <button onclick="fecharGestaoPlanoHistorico()" style="background:#475569; color:white; border:none; padding:10px 12px; border-radius:8px; font-weight:bold;">
+                        FECHAR
+                    </button>
+                </div>
+                ${infoEdicao}
+            </div>
+
+            <div style="padding-top:14px;">
+                ${htmlPedidos || `<div style="text-align:center; color:#94a3b8; padding:20px;">Nenhum pedido neste plano.</div>`}
+                ${htmlStock}
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'block';
+};
+/* ==========================================================
+   PLANO - ADICIONAR NOVO PEDIDO AO PLANO JÁ FECHADO
+   Cole no FINAL do script.js
+   ========================================================== */
+
+function abrirAdicionarNovoPedidoPlanoHistorico(indexPlano) {
+    if (!usuarioPodeEditarPlanoHistorico()) {
+        alert('Apenas ADMIN ou SUPERVISOR podem editar planos do histórico.');
+        return;
+    }
+
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return alert('Plano não encontrado.');
+
+    const modal = document.getElementById('modal-plano-historico');
+    if (!modal) return;
+
+    modal.innerHTML = `
+        <div style="max-width:520px; margin:0 auto; background:#020617; min-height:100%; border-radius:14px; border:1px solid #334155; padding:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; border-bottom:1px solid #334155; padding-bottom:12px;">
+                <div>
+                    <h2 style="color:white; margin:0; font-size:18px;">Novo Pedido</h2>
+                    <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
+                        Adicionar pedido ao plano de ${rel.data}
+                    </div>
+                </div>
+                <button onclick="renderizarGestaoPlanoHistorico(${indexPlano})" style="background:#475569; color:white; border:none; padding:10px 12px; border-radius:8px; font-weight:bold;">
+                    VOLTAR
+                </button>
+            </div>
+
+            <div style="padding-top:15px;">
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">NÚMERO DO PEDIDO</label>
+                <input type="text" id="novo-pedido-numero" placeholder="Ex: 12345"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">CLIENTE / DESTINO</label>
+                <input type="text" id="novo-pedido-destino" placeholder="Nome do cliente"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">TIPO DE CHAPA</label>
+                <select id="novo-pedido-tipo" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                    ${OPCOES_TIPO_PLANO.map(v => `<option value="${v}">${v}</option>`).join('')}
+                </select>
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">ESPESSURA</label>
+                <select id="novo-pedido-esp" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                    ${OPCOES_ESPESSURA_PLANO.map(v => `<option value="${v}">${v} mm</option>`).join('')}
+                </select>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div>
+                        <label style="color:#94a3b8; font-size:12px; font-weight:bold;">RAL INFERIOR</label>
+                        <select id="novo-pedido-ral-inf" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                            ${OPCOES_RAL_INF.map(v => `<option value="${v}">${v}</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="color:#94a3b8; font-size:12px; font-weight:bold;">RAL SUPERIOR</label>
+                        <select id="novo-pedido-ral-sup" style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                            ${OPCOES_RAL_SUP.map(v => `<option value="${v}">${v}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">QUANTIDADE DE CHAPAS</label>
+                <input type="number" id="novo-pedido-qtd" value="1"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <label style="color:#94a3b8; font-size:12px; font-weight:bold;">METROS POR CHAPA</label>
+                <input type="number" step="0.01" id="novo-pedido-metros" placeholder="Ex: 6.50"
+                    style="width:100%; margin:6px 0 14px 0; padding:14px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+
+                <button onclick="salvarNovoPedidoPlanoHistorico(${indexPlano})"
+                    style="width:100%; background:#10b981; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; font-size:14px;">
+                    ADICIONAR NOVO PEDIDO
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function salvarNovoPedidoPlanoHistorico(indexPlano) {
+    const rel = db_plano_hist[indexPlano];
+    if (!rel) return;
+
+    const pedidoNumero = document.getElementById('novo-pedido-numero')?.value.trim();
+    const destino = document.getElementById('novo-pedido-destino')?.value.trim();
+    const tipo = document.getElementById('novo-pedido-tipo')?.value;
+    const espessura = document.getElementById('novo-pedido-esp')?.value;
+    const ralInferior = document.getElementById('novo-pedido-ral-inf')?.value;
+    const ralSuperior = document.getElementById('novo-pedido-ral-sup')?.value;
+    const qtd = Number(document.getElementById('novo-pedido-qtd')?.value);
+    const metros = Number(document.getElementById('novo-pedido-metros')?.value);
+
+    if (!pedidoNumero) return alert('Informe o número do pedido.');
+    if (!destino) return alert('Informe o cliente/destino.');
+    if (!qtd || qtd <= 0) return alert('Informe uma quantidade válida.');
+    if (!metros || metros <= 0) return alert('Informe os metros por chapa.');
+
+    const novoItem = {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        modo: 'pedido',
+        tipo: tipo,
+        espessura: espessura,
+        ralSuperior: ralSuperior,
+        ralInferior: ralInferior,
+        quantidadeChapas: qtd,
+        metrosUnidade: metros,
+        totalMetros: Number((qtd * metros).toFixed(2)),
+        pedidoNumero: pedidoNumero,
+        destino: destino,
+        descricao: `PEDIDO ${pedidoNumero}`
+    };
+
+    if (!Array.isArray(rel.itens)) {
+        rel.itens = [];
+    }
+
+    rel.itens.push(novoItem);
+
+    if (!destinosPlano.includes(destino)) {
+        destinosPlano.push(destino);
+        destinosPlano.sort();
+        salvarDestinosPlano();
+    }
+
+    salvarPlanoHistoricoEditado(
+        indexPlano,
+        rel,
+        `Adicionou novo pedido ${pedidoNumero} - ${destino}: ${qtd} chapas x ${metros} m`
+    );
+
+    renderizarGestaoPlanoHistorico(indexPlano);
+    listarHistoricoPlano();
+}
+
+/* Coloca o botão NOVO PEDIDO no topo do GERIR PLANO */
+const renderizarGestaoPlanoHistoricoComNovoPedido = renderizarGestaoPlanoHistorico;
+
+renderizarGestaoPlanoHistorico = function(indexPlano) {
+    renderizarGestaoPlanoHistoricoComNovoPedido(indexPlano);
+
+    const modal = document.getElementById('modal-plano-historico');
+    if (!modal) return;
+
+    const topo = modal.querySelector('div[style*="position:sticky"]');
+    if (!topo) return;
+
+    if (topo.querySelector('#btn-novo-pedido-historico')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'btn-novo-pedido-historico';
+    btn.innerText = 'NOVO PEDIDO';
+    btn.onclick = function() {
+        abrirAdicionarNovoPedidoPlanoHistorico(indexPlano);
+    };
+    btn.style = 'margin-top:10px; width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;';
+
+    topo.appendChild(btn);
+};
 
