@@ -292,32 +292,3 @@ setTimeout(() => {
     });
 }, 2500);
 
-/* Botao temporario para testar sem F12. Pode apagar depois. */
-setTimeout(() => {
-    if (document.getElementById("btn-teste-firebase-atlas")) return;
-
-    const btn = document.createElement("button");
-    btn.id = "btn-teste-firebase-atlas";
-    btn.innerText = "TESTAR FIREBASE";
-    btn.style = `
-        position: fixed;
-        right: 12px;
-        bottom: 12px;
-        z-index: 99999;
-        background: #10b981;
-        color: white;
-        border: none;
-        padding: 14px;
-        border-radius: 10px;
-        font-weight: bold;
-        box-shadow: 0 10px 24px rgba(0,0,0,0.35);
-    `;
-
-    btn.onclick = function() {
-        atlasFirebaseEnviarTudoOrganizadoInterno()
-            .then(() => alert("Firebase funcionando. Dados organizados enviados."))
-            .catch(erro => alert("Erro Firebase: " + erro.message));
-    };
-
-    document.body.appendChild(btn);
-}, 1500);
