@@ -5449,3 +5449,203 @@ document.addEventListener('click', function(evento) {
         return janela;
     };
 })();
+/* ==========================================================
+   PLANO - MARCAR ENCOMENDA / PEDIDO COMO CANCELADO
+   Cole no FINAL do script.js
+   ========================================================== */
+
+(function() {
+    if (window.atlasCancelamentoEncomendaPlanoAtivo) return;
+    window.atlasCancelamentoEncomendaPlanoAtivo = true;
+
+    function pedidoPlanoCancelado(rel, pedidoNumero, destino) {
+        return (rel.itens || []).some(item =>
+            item.modo === 'pedido' &&
+            String(item.pedidoNumero) === String(pedidoNumero) &&
+            String(item.destino) === String(destino) &&
+            item.encomendaCancelada === true
+        );
+    }
+
+    window.alternarCancelamentoEncomendaPlano = function(indexPlano, idItem) {
+        const rel = db_plano_hist[indexPlano];
+        if (!rel) return;
+
+        const itemBase = rel.itens.find(i => String(i.id) === String(idItem));
+        if (!itemBase) return alert('Item não encontrado.');
+
+        const pedidoNumero = itemBase.pedidoNumero;
+        const destino = itemBase.destino;
+        const jaCancelado = pedidoPlanoCancelado(rel, pedidoNumero, destino);
+
+        if (jaCancelado) {
+            const confirmar = confirm(`Reativar a encomenda ${pedidoNumero} - ${destino}?`);
+            if (!confirmar) return;
+
+            rel.itens.forEach(item => {
+                if (
+                    item.modo === 'pedido' &&
+                    String(item.pedidoNumero) === String(pedidoNumero) &&
+                    String(item.destino) === String(destino)
+                ) {
+                    item.encomendaCancelada = false;
+                    item.totalMetros = Number(
+                        item.totalMetrosAntesCancelamento ||
+                        (Number(item.quantidadeChapas || 0) * Number(item.metrosUnidade || 0))
+                    ).toFixed(2);
+
+                    item.totalMetros = Number(item.totalMetros);
+                }
+            });
+
+            salvarPlanoHistoricoEditado(indexPlano, rel, `Reativou encomenda ${pedidoNumero} - ${destino}`);
+        } else {
+            const motivo = prompt(`Motivo do cancelamento da encomenda ${pedidoNumero}:`, 'Encomenda cancelada') || 'Encomenda cancelada';
+            const confirmar = confirm(`Confirmar cancelamento da encomenda ${pedidoNumero} - ${destino}?`);
+            if (!confirmar) return;
+
+            rel.itens.forEach(item => {
+                if (
+                    item.modo === 'pedido' &&
+                    String(item.pedidoNumero) === String(pedidoNumero) &&
+                    String(item.destino) === String(destino)
+                ) {
+                    item.encomendaCancelada = true;
+                    item.motivoCancelamento = motivo;
+                    item.canceladoPor = obterNomeEditorPlano();
+                    item.canceladoEm = new Date().toLocaleString('pt-BR');
+
+                    if (!item.totalMetrosAntesCancelamento) {
+                        item.totalMetrosAntesCancelamento = Number(item.totalMetros || 0);
+                    }
+
+                    item.totalMetros = 0;
+                }
+            });
+
+            salvarPlanoHistoricoEditado(indexPlano, rel, `Cancelou encomenda ${pedidoNumero} - ${destino}: ${motivo}`);
+        }
+
+        renderizarGestaoPlanoHistorico(indexPlano);
+        listarHistoricoPlano();
+    };
+
+    const abrirEdicaoItemPlanoHistoricoOriginalCancelamento = window.abrirEdicaoItemPlanoHistorico;
+
+    window.abrirEdicaoItemPlanoHistorico = function(indexPlano, idItem) {
+        abrirEdicaoItemPlanoHistoricoOriginalCancelamento(indexPlano, idItem);
+
+        const rel = db_plano_hist[indexPlano];
+        if (!rel) return;
+
+        const item = rel.itens.find(i => String(i.id) === String(idItem));
+        if (!item || item.modo !== 'pedido') return;
+
+        const modal = document.getElementById('modal-plano-historico');
+        if (!modal) return;
+
+        const jaCancelado = pedidoPlanoCancelado(rel, item.pedidoNumero, item.destino);
+        const cor = jaCancelado ? '#10b981' : '#ef4444';
+        const texto = jaCancelado ? 'REATIVAR ENCOMENDA' : 'MARCAR ENCOMENDA CANCELADA';
+
+        const bloco = document.createElement('div');
+        bloco.style = `
+            background:${jaCancelado ? '#052e16' : '#450a0a'};
+            border:1px solid ${cor};
+            color:white;
+            padding:12px;
+            border-radius:10px;
+            margin:15px 0;
+        `;
+
+        bloco.innerHTML = `
+            <div style="font-size:12px; color:#cbd5e1; margin-bottom:8px;">
+                Estado da encomenda:
+                <b style="color:${cor};">${jaCancelado ? 'CANCELADA' : 'ATIVA'}</b>
+            </div>
+
+            ${jaCancelado ? `
+                <div style="font-size:12px; color:#cbd5e1; margin-bottom:8px;">
+                    Motivo: <b>${item.motivoCancelamento || '-'}</b><br>
+                    Cancelado por: <b>${item.canceladoPor || '-'}</b><br>
+                    Em: <b>${item.canceladoEm || '-'}</b>
+                </div>
+            ` : ''}
+
+            <button onclick="alternarCancelamentoEncomendaPlano(${indexPlano}, '${String(idItem).replace(/'/g, "\\'")}')"
+                style="width:100%; background:${cor}; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">
+                ${texto}
+            </button>
+        `;
+
+        const areaEdicao = modal.querySelector('div[style*="padding-top:15px"]');
+        if (areaEdicao) {
+            areaEdicao.prepend(bloco);
+        }
+    };
+
+    window.salvarEdicaoItemPlanoHistorico = function(indexPlano, idItem) {
+        const rel = db_plano_hist[indexPlano];
+        if (!rel) return;
+
+        const item = rel.itens.find(i => String(i.id) === String(idItem));
+        if (!item) return;
+
+        const qtd = Number(document.getElementById('edit-plano-qtd')?.value);
+        const metros = Number(document.getElementById('edit-plano-metros')?.value);
+
+        if (!qtd || qtd <= 0) return alert('Informe uma quantidade válida.');
+        if (!metros || metros <= 0) return alert('Informe os metros válidos.');
+
+        item.quantidadeChapas = qtd;
+        item.metrosUnidade = metros;
+
+        if (item.encomendaCancelada) {
+            item.totalMetrosAntesCancelamento = Number((qtd * metros).toFixed(2));
+            item.totalMetros = 0;
+        } else {
+            item.totalMetros = Number((qtd * metros).toFixed(2));
+        }
+
+        salvarPlanoHistoricoEditado(
+            indexPlano,
+            rel,
+            `Editou item ${item.pedidoNumero ? 'do pedido ' + item.pedidoNumero : 'de stock'}: ${qtd} chapas x ${metros} m`
+        );
+
+        renderizarGestaoPlanoHistorico(indexPlano);
+        listarHistoricoPlano();
+    };
+})();
+/* ==========================================================
+   PLANO - NÃO MOSTRAR ENCOMENDAS CANCELADAS NO PDF
+   Cole no FINAL do script.js, depois do bloco de cancelamento
+   ========================================================== */
+
+(function() {
+    if (window.atlasPDFSemCanceladasAtivo) return;
+    window.atlasPDFSemCanceladasAtivo = true;
+
+    const gerarPDFPlanoOriginalSemCanceladas = window.gerarPDF_Plano;
+
+    window.gerarPDF_Plano = function(dadosEncoded) {
+        const rel = JSON.parse(decodeURIComponent(dadosEncoded));
+
+        const relSemCanceladas = {
+            ...rel,
+            itens: (rel.itens || []).filter(item => item.encomendaCancelada !== true)
+        };
+
+        relSemCanceladas.totalGeral = Number(
+            relSemCanceladas.itens.reduce((acc, item) => acc + Number(item.totalMetros || 0), 0).toFixed(2)
+        );
+
+        if (typeof gerarResumoPlano === 'function') {
+            relSemCanceladas.resumo = gerarResumoPlano(relSemCanceladas.itens);
+        }
+
+        const janela = window.open('', '_blank');
+        janela.document.write(montarHTMLPlano(relSemCanceladas, true));
+        janela.document.close();
+    };
+})();
