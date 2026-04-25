@@ -5,13 +5,15 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
 import {
-    getFirestore,
-    doc,
-    getDocs,
-    collection,
-    setDoc,
-    deleteDoc,
-    serverTimestamp
+   getFirestore,
+doc,
+getDoc,
+getDocs,
+collection,
+setDoc,
+deleteDoc,
+serverTimestamp
+
 } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -285,10 +287,39 @@ window.atlasFirebaseStatus = {
     app: atlasFirebaseApp,
     db: atlasFirestore
 };
+async function atlasFirebaseBaixarBackupInicial() {
+    const jaBaixou = sessionStorage.getItem("atlas_firebase_backup_baixado");
+    if (jaBaixou === "sim") return;
+
+    const snap = await getDoc(doc(atlasFirestore, "backups_localstorage", "ultimo_backup"));
+
+    if (!snap.exists()) return;
+
+    const dados = snap.data()?.dados || {};
+    const chaves = Object.keys(dados);
+
+    if (chaves.length === 0) return;
+
+    atlasFirebaseBloqueado = true;
+
+    chaves.forEach(chave => {
+        if (typeof dados[chave] === "string") {
+            localStorage.setItem(chave, dados[chave]);
+        }
+    });
+
+    atlasFirebaseBloqueado = false;
+
+    sessionStorage.setItem("atlas_firebase_backup_baixado", "sim");
+    location.reload();
+}
 
 setTimeout(() => {
-    atlasFirebaseEnviarTudoOrganizadoInterno().catch(erro => {
-        console.error("Erro inicial Firebase:", erro);
-    });
-}, 2500);
+    atlasFirebaseBaixarBackupInicial()
+        .then(() => atlasFirebaseEnviarTudoOrganizadoInterno())
+        .catch(erro => {
+            console.error("Erro inicial Firebase:", erro);
+        });
+}, 1500);
+
 
