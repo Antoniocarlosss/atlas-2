@@ -5216,4 +5216,141 @@ function finalizarPedidoConferenciaSerra(idPedido) {
     salvarConferenciaSerra();
     abrirPedidoConferenciaSerra(idPedido);
 }
+/* ==========================================================
+   BOTÃO VOLTAR INTELIGENTE - VOLTA PARA O ÚLTIMO CLIQUE
+   Cole no FINAL do script.js
+   ========================================================== */
+
+let historicoTelasAtlas = [];
+let telaAtualAtlas = null;
+let bloqueiaHistoricoAtlas = false;
+
+function capturarTelaAtualAtlas() {
+    const titulo = document.getElementById('titulo-modulo');
+    const render = document.getElementById('render-modulo');
+    const grid = document.getElementById('grid-home');
+    const conteudo = document.getElementById('conteudo-modulo');
+
+    if (!titulo || !render || !grid || !conteudo) return null;
+    if (conteudo.style.display === 'none') return null;
+
+    return {
+        titulo: titulo.innerText,
+        html: render.innerHTML
+    };
+}
+
+function telasIguaisAtlas(a, b) {
+    if (!a || !b) return false;
+    return a.titulo === b.titulo && a.html === b.html;
+}
+
+function salvarTelaAnteriorAtlas() {
+    if (bloqueiaHistoricoAtlas) return;
+
+    const tela = capturarTelaAtualAtlas();
+    if (!tela || !tela.html.trim()) return;
+
+    const ultima = historicoTelasAtlas[historicoTelasAtlas.length - 1];
+    if (!telasIguaisAtlas(tela, ultima)) {
+        historicoTelasAtlas.push(tela);
+    }
+
+    if (historicoTelasAtlas.length > 30) {
+        historicoTelasAtlas.shift();
+    }
+}
+
+function restaurarTelaAtlas(tela) {
+    const titulo = document.getElementById('titulo-modulo');
+    const render = document.getElementById('render-modulo');
+    const grid = document.getElementById('grid-home');
+    const conteudo = document.getElementById('conteudo-modulo');
+
+    if (!titulo || !render || !grid || !conteudo) return;
+
+    bloqueiaHistoricoAtlas = true;
+
+    grid.style.display = 'none';
+    conteudo.style.display = 'block';
+    titulo.innerText = tela.titulo;
+    render.innerHTML = tela.html;
+
+    setTimeout(() => {
+        bloqueiaHistoricoAtlas = false;
+        telaAtualAtlas = capturarTelaAtualAtlas();
+    }, 50);
+}
+
+const voltarHomeOriginalAtlas = voltarHome;
+
+voltarHome = function() {
+    if (historicoTelasAtlas.length > 0) {
+        const telaAnterior = historicoTelasAtlas.pop();
+        restaurarTelaAtlas(telaAnterior);
+        return;
+    }
+
+    voltarHomeOriginalAtlas();
+};
+
+const abrirModuloOriginalAtlas = abrirModulo;
+
+abrirModulo = function(nome) {
+    historicoTelasAtlas = [];
+    abrirModuloOriginalAtlas(nome);
+
+    setTimeout(() => {
+        telaAtualAtlas = capturarTelaAtualAtlas();
+    }, 50);
+};
+
+document.addEventListener('click', function(evento) {
+    const alvo = evento.target.closest('[onclick]');
+    if (!alvo) return;
+
+    const render = document.getElementById('render-modulo');
+    if (!render || !render.contains(alvo)) return;
+
+    const acao = alvo.getAttribute('onclick') || '';
+
+    const acoesQueMudamTela = [
+        'exibir',
+        'renderizar',
+        'listar',
+        'abrir',
+        'iniciar',
+        'moduloBobine',
+        'setModoCorte',
+        'setModoCorteSerra',
+        'alternarAba',
+        'retomarPlano',
+        'visualizarPlanoDigital'
+    ];
+
+    const acoesIgnoradas = [
+        'toggle',
+        'gerarPDF',
+        'window.print',
+        'remover',
+        'deletar',
+        'excluir',
+        'marcarUnidade',
+        'finalizarPedidoConferenciaSerra',
+        'fechar',
+        'salvar',
+        'adicionar',
+        'setQtd',
+        'setLado',
+        'setTipo',
+        'setStatus'
+    ];
+
+    const deveIgnorar = acoesIgnoradas.some(txt => acao.includes(txt));
+    const mudaTela = acoesQueMudamTela.some(txt => acao.includes(txt));
+
+    if (mudaTela && !deveIgnorar) {
+        salvarTelaAnteriorAtlas();
+    }
+}, true);
 
