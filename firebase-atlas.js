@@ -1,3 +1,151 @@
+/* ==========================================================
+   ATLAS - FIREBASE ORGANIZADO
+   Arquivo: firebase-atlas.js
+   ========================================================== */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import {
+    getFirestore,
+    doc,
+    getDocs,
+    collection,
+    setDoc,
+    deleteDoc,
+    serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyCpSrCxE4UR4b1TMV54PVaIJk-VfKqGYdI",
+    authDomain: "atlas-painel.firebaseapp.com",
+    projectId: "atlas-painel",
+    storageBucket: "atlas-painel.firebasestorage.app",
+    messagingSenderId: "90696632690",
+    appId: "1:90696632690:web:764621e567f390e0e9f5eb",
+    measurementId: "G-FDS3MKMB4X"
+};
+
+const atlasFirebaseApp = initializeApp(firebaseConfig);
+const atlasFirestore = getFirestore(atlasFirebaseApp);
+
+let atlasFirebaseBloqueado = false;
+let atlasFirebaseTimer = null;
+
+function atlasFirebaseNomeUsuario() {
+    return document.getElementById("user-display")?.innerText || "SEM USUARIO";
+}
+
+function atlasParseJSON(chave, fallback) {
+    try {
+        return JSON.parse(localStorage.getItem(chave)) ?? fallback;
+    } catch (erro) {
+        return fallback;
+    }
+}
+
+function atlasDocId(texto) {
+    return String(texto ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w.-]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 120) || String(Date.now());
+}
+
+function atlasDataPartes(dataBR) {
+    const [dia, mes, ano] = String(dataBR || "").split("/");
+    return {
+        dia: Number(dia) || null,
+        mes: Number(mes) || null,
+        ano: Number(ano) || null
+    };
+}
+
+async function atlasSetDoc(caminho, dados) {
+    await setDoc(doc(atlasFirestore, ...caminho), {
+        ...dados,
+        atualizadoPor: atlasFirebaseNomeUsuario(),
+        atualizadoEm: serverTimestamp()
+    }, { merge: true });
+}
+
+async function atlasLimparColecao(nomeColecao) {
+    const snap = await getDocs(collection(atlasFirestore, nomeColecao));
+    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+}
+
+async function atlasEnviarUsuarios() {
+    const usuarios = atlasParseJSON("atlas_usuarios", []);
+    await atlasLimparColecao("usuarios");
+
+    await Promise.all(usuarios.map(usuario => {
+        const id = atlasDocId(usuario.id);
+        return atlasSetDoc(["usuarios", id], {
+            id: usuario.id,
+            senha: usuario.senha,
+            cargo: usuario.cargo,
+            bloqueado: usuario.bloqueado === true
+        });
+    }));
+}
+
+async function atlasEnviarInjecao() {
+    const db = atlasParseJSON("atlas_db", {});
+    await atlasLimparColecao("injecao");
+
+    const promessas = [];
+
+    Object.keys(db).forEach(ano => {
+        Object.keys(db[ano] || {}).forEach(mesNome => {
+            (db[ano][mesNome] || []).forEach((rel, index) => {
+                if (rel.modulo !== "injecao") return;
+
+                const id = atlasDocId(`${ano}_${mesNome}_${rel.data}_${index}`);
+                promessas.push(atlasSetDoc(["injecao", id], {
+                    id,
+                    ano: Number(ano),
+                    mesNome,
+                    data: rel.data,
+                    operador: rel.operador,
+                    totalMetros: (rel.itens || []).reduce((acc, item) => acc + Number(item.metros || 0), 0),
+                    itens: rel.itens || [],
+                    editadoPor: rel.editadoPor || "",
+                    editadoEm: rel.editadoEm || "",
+                    historicoEdicoes: rel.historicoEdicoes || []
+                }));
+            });
+        });
+    });
+
+    await Promise.all(promessas);
+}
+
+async function atlasEnviarBobines() {
+    const historico = atlasParseJSON("historicoBobines", []);
+    await atlasLimparColecao("bobines");
+
+    await Promise.all(historico.map((rel, index) => {
+        const id = atlasDocId(rel.id || `${rel.data}_${index}`);
+        return atlasSetDoc(["bobines", id], {
+            id,
+            data: rel.data,
+            dia: rel.dia || null,
+            mes: rel.mes || null,
+            ano: rel.ano || null,
+            hora: rel.hora || "",
+            operador: rel.operador || "",
+            totalProducoes: Array.from(new Set((rel.itens || []).map(item => item.producao))).length,
+            itens: rel.itens || [],
+            editadoPor: rel.editadoPor || "",
+            editadoEm: rel.editadoEm || "",
+            historicoEdicoes: rel.historicoEdicoes || []
+        });
+    }));
+}
+
+async function atlasEnviarCorte(nomeColecao, chaveLocalStorage) {
+    const historico = atlasParseJSON(chaveLocalStorage, []);
+    await atlasLimparColecao(nomeColecao);
+
     await Promise.all(historico.map((rel, index) => {
         const partes = rel.ano ? {} : atlasDataPartes(rel.data);
         const id = atlasDocId(rel.id || `${rel.data}_${index}`);
@@ -16,7 +164,7 @@
             historicoEdicoes: rel.historicoEdicoes || []
         });
     }));
-
+}
 
 async function atlasEnviarPlanos() {
     const historico = atlasParseJSON("atlas_plano_hist", []);
@@ -80,10 +228,7 @@ async function atlasEnviarBackupLocalStorage() {
 
     for (let i = 0; i < localStorage.length; i++) {
         const chave = localStorage.key(i);
-        if (
-            chave.startsWith("atlas_") ||
-            chave === "historicoBobines"
-        ) {
+        if (chave.startsWith("atlas_") || chave === "historicoBobines") {
             backup[chave] = localStorage.getItem(chave);
         }
     }
