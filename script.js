@@ -5354,81 +5354,98 @@ document.addEventListener('click', function(evento) {
     }
 }, true);
 /* ==========================================================
-   BOTÃO VOLTAR / FECHAR EM TODOS OS PDFs
+   BOTÃO VOLTAR / FECHAR NOS PDFS - VERSÃO MOBILE
    Cole no FINAL do script.js ou historicos-admin.js
    ========================================================== */
 
 (function() {
-    if (window.atlasPDFVoltarAtivado) return;
-    window.atlasPDFVoltarAtivado = true;
+    if (window.atlasPDFVoltarMobileAtivado) return;
+    window.atlasPDFVoltarMobileAtivado = true;
 
-    const abrirJanelaOriginalAtlas = window.open;
+    const windowOpenOriginalAtlas = window.open;
 
     window.open = function() {
-        const janela = abrirJanelaOriginalAtlas.apply(window, arguments);
+        const janela = windowOpenOriginalAtlas.apply(window, arguments);
 
-        if (!janela || !janela.document) {
-            return janela;
-        }
+        if (!janela) return janela;
 
-        try {
-            const fecharOriginal = janela.document.close.bind(janela.document);
+        const tentarAdicionarBotao = function() {
+            try {
+                if (!janela.document || !janela.document.body) return;
+                if (janela.document.getElementById('atlas-botao-voltar-pdf')) return;
 
-            janela.document.close = function() {
-                fecharOriginal();
+                const style = janela.document.createElement('style');
+                style.innerHTML = `
+                    #atlas-botao-voltar-pdf {
+                        position: fixed !important;
+                        left: 10px !important;
+                        right: 10px !important;
+                        bottom: 10px !important;
+                        bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+                        z-index: 2147483647 !important;
+                        display: block !important;
+                        pointer-events: auto !important;
+                    }
 
-                setTimeout(function() {
-                    try {
-                        if (!janela.document || janela.document.getElementById('atlas-btn-voltar-pdf')) return;
+                    #atlas-botao-voltar-pdf button {
+                        width: 100% !important;
+                        padding: 16px !important;
+                        background: #E31C24 !important;
+                        color: #fff !important;
+                        border: 3px solid #000 !important;
+                        border-radius: 10px !important;
+                        font-size: 16px !important;
+                        font-weight: bold !important;
+                        box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
+                    }
 
-                        const style = janela.document.createElement('style');
-                        style.innerHTML = `
-                            @media print {
-                                #atlas-btn-voltar-pdf { display: none !important; }
-                            }
-                        `;
-                        janela.document.head.appendChild(style);
+                    body {
+                        padding-bottom: 90px !important;
+                    }
 
-                        const area = janela.document.createElement('div');
-                        area.id = 'atlas-btn-voltar-pdf';
-                        area.className = 'no-print';
-                        area.style = 'text-align:center; padding:20px; margin-top:10px;';
+                    @media print {
+                        #atlas-botao-voltar-pdf {
+                            display: none !important;
+                        }
 
-                        area.innerHTML = `
-                            <button onclick="
-                                try { window.close(); } catch(e) {}
-                                setTimeout(function() {
-                                    if (!window.closed) {
-                                        if (history.length > 1) {
-                                            history.back();
-                                        }
-                                    }
-                                }, 100);
-                            " style="
-                                padding:20px;
-                                background:#475569;
-                                color:#fff;
-                                border:3px solid #94a3b8;
-                                width:100%;
-                                max-width:700px;
-                                font-size:18px;
-                                font-weight:bold;
-                                border-radius:10px;
-                                cursor:pointer;
-                                margin-bottom:10px;
-                            ">
-                                VOLTAR / FECHAR
-                            </button>
-                        `;
+                        body {
+                            padding-bottom: 0 !important;
+                        }
+                    }
+                `;
 
-                        janela.document.body.appendChild(area);
-                    } catch (e) {}
-                }, 200);
-            };
-        } catch (e) {}
+                janela.document.head.appendChild(style);
+
+                const div = janela.document.createElement('div');
+                div.id = 'atlas-botao-voltar-pdf';
+                div.className = 'no-print';
+                div.innerHTML = `
+                    <button type="button" onclick="
+                        try { window.close(); } catch(e) {}
+                        setTimeout(function() {
+                            try { history.back(); } catch(e) {}
+                        }, 150);
+                    ">
+                        VOLTAR / FECHAR
+                    </button>
+                `;
+
+                janela.document.body.appendChild(div);
+            } catch (erro) {}
+        };
+
+        const documentCloseOriginal = janela.document.close;
+
+        janela.document.close = function() {
+            const resultado = documentCloseOriginal.apply(janela.document, arguments);
+
+            setTimeout(tentarAdicionarBotao, 100);
+            setTimeout(tentarAdicionarBotao, 500);
+            setTimeout(tentarAdicionarBotao, 1200);
+
+            return resultado;
+        };
 
         return janela;
     };
 })();
-
-
