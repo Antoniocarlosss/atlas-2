@@ -5556,6 +5556,295 @@ document.addEventListener('click', function(evento) {
         return janela;
     };
 })();
+
+/* ==========================================================
+   LIXEIRA ATLAS - 7 DIAS PARA RECUPERAR
+   ========================================================== */
+
+const ATLAS_LIXEIRA_KEY = 'atlas_lixeira';
+const ATLAS_LIXEIRA_DIAS = 7;
+
+function atlasUsuarioAtualNome() {
+    return document.getElementById('user-display')?.innerText || usuarioLogado?.nome || usuarioLogado?.id || 'SEM USUARIO';
+}
+
+function atlasLixeiraLer() {
+    try {
+        return JSON.parse(localStorage.getItem(ATLAS_LIXEIRA_KEY)) || [];
+    } catch (erro) {
+        return [];
+    }
+}
+
+function atlasLixeiraSalvar(lista) {
+    localStorage.setItem(ATLAS_LIXEIRA_KEY, JSON.stringify(lista));
+}
+
+function atlasLixeiraLimparExpirados() {
+    const agora = Date.now();
+    const limite = ATLAS_LIXEIRA_DIAS * 24 * 60 * 60 * 1000;
+    atlasLixeiraSalvar(atlasLixeiraLer().filter(item => agora - Number(item.apagadoTimestamp || 0) < limite));
+}
+
+function atlasLixeiraEnviar(secao, titulo, chave, dados, extras = {}) {
+    atlasLixeiraLimparExpirados();
+
+    const item = {
+        id: `${Date.now()}_${Math.floor(Math.random() * 100000)}`,
+        secao,
+        titulo,
+        chave,
+        dados: JSON.parse(JSON.stringify(dados || null)),
+        extras,
+        apagadoPor: atlasUsuarioAtualNome(),
+        apagadoEm: new Date().toLocaleString('pt-BR'),
+        apagadoTimestamp: Date.now(),
+        expiraEm: new Date(Date.now() + ATLAS_LIXEIRA_DIAS * 24 * 60 * 60 * 1000).toLocaleString('pt-BR')
+    };
+
+    const lista = atlasLixeiraLer();
+    lista.unshift(item);
+    atlasLixeiraSalvar(lista);
+    return item;
+}
+
+function atlasLixeiraRemover(id) {
+    atlasLixeiraSalvar(atlasLixeiraLer().filter(item => String(item.id) !== String(id)));
+}
+
+function atlasLixeiraRestaurarItem(item) {
+    if (!item) return false;
+
+    if (item.chave === 'historicoBobines') {
+        historicoBobines = JSON.parse(localStorage.getItem('historicoBobines')) || [];
+        historicoBobines.unshift(item.dados);
+        localStorage.setItem('historicoBobines', JSON.stringify(historicoBobines));
+        return true;
+    }
+
+    if (['atlas_serra_hist', 'atlas_emb_hist', 'atlas_plano_hist'].includes(item.chave)) {
+        const hist = JSON.parse(localStorage.getItem(item.chave)) || [];
+        hist.unshift(item.dados);
+        localStorage.setItem(item.chave, JSON.stringify(hist));
+        if (item.chave === 'atlas_serra_hist') db_serra_hist = hist;
+        if (item.chave === 'atlas_emb_hist') db_emb_hist = hist;
+        if (item.chave === 'atlas_plano_hist') db_plano_hist = hist;
+        return true;
+    }
+
+    if (item.chave === 'atlas_db') {
+        const db = JSON.parse(localStorage.getItem('atlas_db')) || {};
+        const ano = item.extras?.ano || item.dados?.ano || new Date().getFullYear();
+        const mes = item.extras?.mes || item.dados?.mesNome || item.dados?.mes || 'SEM MES';
+        if (!db[ano]) db[ano] = {};
+        if (!db[ano][mes]) db[ano][mes] = [];
+        db[ano][mes].unshift(item.dados);
+        localStorage.setItem('atlas_db', JSON.stringify(db));
+        return true;
+    }
+
+    return false;
+}
+
+function atlasRestaurarDaLixeira(id) {
+    const item = atlasLixeiraLer().find(x => String(x.id) === String(id));
+    if (!item) return alert('Item não encontrado na lixeira.');
+    if (!confirm(`Restaurar?\n\n${item.titulo}`)) return;
+
+    if (!atlasLixeiraRestaurarItem(item)) {
+        alert('Não foi possível restaurar este item automaticamente.');
+        return;
+    }
+
+    atlasLixeiraRemover(id);
+    renderizarLixeiraAtlas();
+    alert('Item restaurado.');
+}
+
+function atlasApagarDefinitivoDaLixeira(id) {
+    if (!confirm('Apagar definitivamente este item da lixeira?')) return;
+    atlasLixeiraRemover(id);
+    renderizarLixeiraAtlas();
+}
+
+function renderizarLixeiraAtlas() {
+    atlasLixeiraLimparExpirados();
+
+    const render = document.getElementById('render-modulo');
+    if (!render) return;
+
+    const lista = atlasLixeiraLer();
+    const porSecao = lista.reduce((acc, item) => {
+        acc[item.secao] ||= [];
+        acc[item.secao].push(item);
+        return acc;
+    }, {});
+
+    let html = `
+        <div style="padding:15px; color:white;">
+            <h2 style="margin-top:0; border-bottom:2px solid #ef4444; padding-bottom:10px;">Lixeira</h2>
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; padding:12px; color:#cbd5e1; font-size:13px; margin-bottom:14px;">
+                Itens apagados ficam aqui por ${ATLAS_LIXEIRA_DIAS} dias. Depois sao removidos automaticamente.
+            </div>
+    `;
+
+    if (!lista.length) {
+        html += `<div style="text-align:center; padding:45px; color:#94a3b8;">Lixeira vazia.</div>`;
+    }
+
+    Object.keys(porSecao).sort().forEach(secao => {
+        html += `
+            <div style="margin-bottom:18px;">
+                <h3 style="font-size:14px; color:#fca5a5; margin:0 0 8px 0; text-transform:uppercase;">${textoSeguroConferencia(secao)}</h3>
+                ${porSecao[secao].map(item => `
+                    <div style="background:#111827; border:1px solid #334155; border-left:5px solid #ef4444; border-radius:10px; padding:12px; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                            <b>${textoSeguroConferencia(item.titulo)}</b>
+                            <span style="color:#fca5a5; font-size:12px;">Expira: ${textoSeguroConferencia(item.expiraEm)}</span>
+                        </div>
+                        <div style="color:#94a3b8; font-size:12px; margin-top:6px;">
+                            Apagado por: <b style="color:white;">${textoSeguroConferencia(item.apagadoPor)}</b><br>
+                            Data/hora: ${textoSeguroConferencia(item.apagadoEm)}
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
+                            <button onclick="atlasRestaurarDaLixeira('${item.id}')" style="background:#10b981; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">RESTAURAR</button>
+                            <button onclick="atlasApagarDefinitivoDaLixeira('${item.id}')" style="background:#7f1d1d; color:white; border:none; padding:10px; border-radius:8px; font-weight:bold;">APAGAR</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    });
+
+    render.innerHTML = html + `</div>`;
+}
+
+function atlasInstalarLixeira() {
+    atlasLixeiraLimparExpirados();
+
+    if (!document.getElementById('card-lixeira-atlas')) {
+        const grid = document.getElementById('grid-home');
+        if (grid) {
+            const card = document.createElement('div');
+            card.id = 'card-lixeira-atlas';
+            card.className = 'card';
+            card.setAttribute('onclick', "abrirModulo('lixeira')");
+            card.innerHTML = `<i class="fas fa-trash-can"></i><span>Lixeira</span>`;
+            grid.appendChild(card);
+        }
+    }
+
+    if (!window.abrirModuloOriginalLixeiraAtlas) {
+        window.abrirModuloOriginalLixeiraAtlas = abrirModulo;
+        abrirModulo = function(nome) {
+            if (nome === 'lixeira') {
+                document.getElementById('grid-home').style.display = 'none';
+                document.getElementById('conteudo-modulo').style.display = 'block';
+                document.getElementById('titulo-modulo').innerText = 'LIXEIRA';
+                renderizarLixeiraAtlas();
+                return;
+            }
+            window.abrirModuloOriginalLixeiraAtlas(nome);
+        };
+    }
+
+    if (typeof atlasApagarRelatorioBobines === 'function' && !window.atlasApagarRelatorioBobinesComLixeira) {
+        window.atlasApagarRelatorioBobinesComLixeira = atlasApagarRelatorioBobines;
+        atlasApagarRelatorioBobines = function(index) {
+            if (!atlasPodeGerirHistoricos()) return alert('Apenas ADMIN ou SUPERVISOR podem apagar históricos.');
+            const rel = historicoBobines[index];
+            if (!rel) return alert('Relatório não encontrado.');
+            if (!confirm('Mover este relatório para a lixeira?')) return;
+            atlasLixeiraEnviar('Bobines', `Bobines - ${rel.data || 'sem data'}`, 'historicoBobines', rel);
+            historicoBobines.splice(index, 1);
+            localStorage.setItem('historicoBobines', JSON.stringify(historicoBobines));
+            atlasFecharModal('modal-gerir-bobines');
+            renderizarHistoricoBobines();
+            alert('Relatório movido para a lixeira.');
+        };
+    }
+
+    if (typeof atlasApagarRelatorioCorte === 'function' && !window.atlasApagarRelatorioCorteComLixeira) {
+        window.atlasApagarRelatorioCorteComLixeira = atlasApagarRelatorioCorte;
+        atlasApagarRelatorioCorte = function(tipo, index) {
+            if (!atlasPodeGerirHistoricos()) return alert('Apenas ADMIN ou SUPERVISOR podem apagar históricos.');
+            const cfg = atlasGetStoreCorte(tipo);
+            const rel = cfg.hist[index];
+            if (!rel) return alert('Relatório não encontrado.');
+            if (!confirm('Mover este relatório para a lixeira?')) return;
+            atlasLixeiraEnviar(tipo === 'serra' ? 'Serra' : 'Embalagem', `${tipo} - ${rel.data || 'sem data'}`, cfg.key, rel);
+            cfg.hist.splice(index, 1);
+            localStorage.setItem(cfg.key, JSON.stringify(cfg.hist));
+            if (tipo === 'serra') db_serra_hist = cfg.hist;
+            if (tipo === 'embalagem') db_emb_hist = cfg.hist;
+            atlasFecharModal(cfg.modal);
+            cfg.listar();
+            alert('Relatório movido para a lixeira.');
+        };
+    }
+
+    if (typeof atlasApagarRelatorioInjecao === 'function' && !window.atlasApagarRelatorioInjecaoComLixeira) {
+        window.atlasApagarRelatorioInjecaoComLixeira = atlasApagarRelatorioInjecao;
+        atlasApagarRelatorioInjecao = function(ano, mes, index, modulo) {
+            if (!atlasPodeGerirHistoricos()) return alert('Apenas ADMIN ou SUPERVISOR podem apagar históricos.');
+            const db = JSON.parse(localStorage.getItem('atlas_db')) || {};
+            const rel = db?.[ano]?.[mes]?.[index];
+            if (!rel) return alert('Relatório não encontrado.');
+            if (!confirm('Mover este relatório para a lixeira?')) return;
+            atlasLixeiraEnviar('Injecao', `Injecao - ${rel.data || 'sem data'}`, 'atlas_db', rel, { ano, mes });
+            db[ano][mes].splice(index, 1);
+            if (db[ano][mes].length === 0) delete db[ano][mes];
+            if (Object.keys(db[ano]).length === 0) delete db[ano];
+            localStorage.setItem('atlas_db', JSON.stringify(db));
+            atlasFecharModal('modal-gerir-injecao');
+            exibirHistoricoModulo(modulo);
+            alert('Relatório movido para a lixeira.');
+        };
+    }
+
+    if (typeof deletarHistoricoBobine === 'function' && !window.deletarHistoricoBobineComLixeira) {
+        window.deletarHistoricoBobineComLixeira = deletarHistoricoBobine;
+        deletarHistoricoBobine = function(index) {
+            const rel = historicoBobines[index];
+            if (!rel) return;
+            if (!confirm('Mover este relatório para a lixeira?')) return;
+            atlasLixeiraEnviar('Bobines', `Bobines - ${rel.data || 'sem data'}`, 'historicoBobines', rel);
+            historicoBobines.splice(index, 1);
+            localStorage.setItem('historicoBobines', JSON.stringify(historicoBobines));
+            renderizarHistoricoBobines();
+        };
+    }
+
+    if (typeof removerItemPlanoHistorico === 'function' && !window.removerItemPlanoHistoricoComLixeira) {
+        window.removerItemPlanoHistoricoComLixeira = removerItemPlanoHistorico;
+        removerItemPlanoHistorico = function(indexPlano, idItem) {
+            const rel = db_plano_hist[indexPlano];
+            const item = rel?.itens?.find(i => String(i.id) === String(idItem));
+            window.removerItemPlanoHistoricoComLixeira(indexPlano, idItem);
+            const aindaExiste = (db_plano_hist[indexPlano]?.itens || []).some(i => String(i.id) === String(idItem));
+            if (item && !aindaExiste) {
+                atlasLixeiraEnviar('Plano', `Item plano - ${item.pedidoNumero || item.descricao || 'stock'}`, 'atlas_plano_hist', { ...rel, itens: [item] });
+            }
+        };
+    }
+
+    if (typeof removerPedidoPlanoHistorico === 'function' && !window.removerPedidoPlanoHistoricoComLixeira) {
+        window.removerPedidoPlanoHistoricoComLixeira = removerPedidoPlanoHistorico;
+        removerPedidoPlanoHistorico = function(indexPlano, pedidoNumero, destino) {
+            const rel = db_plano_hist[indexPlano];
+            const itens = (rel?.itens || []).filter(item => item.modo === 'pedido' && String(item.pedidoNumero) === String(pedidoNumero) && String(item.destino) === String(destino));
+            window.removerPedidoPlanoHistoricoComLixeira(indexPlano, pedidoNumero, destino);
+            const aindaExistem = (db_plano_hist[indexPlano]?.itens || []).some(item => item.modo === 'pedido' && String(item.pedidoNumero) === String(pedidoNumero) && String(item.destino) === String(destino));
+            if (itens.length && !aindaExistem) {
+                atlasLixeiraEnviar('Plano', `Pedido ${pedidoNumero} - ${destino}`, 'atlas_plano_hist', { ...rel, itens });
+            }
+        };
+    }
+}
+
+window.addEventListener('load', () => {
+    setTimeout(atlasInstalarLixeira, 300);
+});
 /* ==========================================================
    PLANO - MARCAR ENCOMENDA / PEDIDO COMO CANCELADO
    Cole no FINAL do script.js
@@ -6086,6 +6375,14 @@ document.addEventListener('click', function(evento) {
                     const pendente = (conf.unidades || []).filter(u => u.status === 'pendente').length;
                     const statusConfTexto = conf.status === 'finalizado' ? 'OK' : (conf.status === 'stand_by' ? 'STAND BY' : 'FALTA CONFERIR');
                     const statusConfCor = conf.status === 'finalizado' ? '#10b981' : (conf.status === 'stand_by' ? '#ef4444' : '#f59e0b');
+                    const motivos = (conf.unidades || [])
+                        .filter(u => u.status === 'nao')
+                        .flatMap((u, idx) => motivosUnidadeConferenciaSerra(u).map(motivo => ({
+                            unidade: idx + 1,
+                            motivo,
+                            conferidoPor: u.conferidoPor || '-',
+                            conferidoEm: u.conferidoEm || '-'
+                        })));
 
                     return `
                         <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
@@ -6100,6 +6397,14 @@ document.addEventListener('click', function(evento) {
                                 Finalizado por: ${atlasTextoSeguro(conf.finalizadoPor || '-')}<br>
                                 Finalizado em: ${atlasTextoSeguro(conf.finalizadoEm || '-')}
                             </div>
+                            ${motivos.length ? `
+                                <div style="background:#450a0a; border:1px solid #ef4444; border-radius:8px; padding:10px; color:#fca5a5; font-size:12px; margin-top:8px;">
+                                    <b>Motivos do stand by:</b>
+                                    <ol style="margin:6px 0 0 18px; padding:0;">
+                                        ${motivos.map(m => `<li>Unidade ${m.unidade}: ${atlasTextoSeguro(m.motivo)}<br><span style="color:#fecaca;">Conferido por ${atlasTextoSeguro(m.conferidoPor)} em ${atlasTextoSeguro(m.conferidoEm)}</span></li>`).join('')}
+                                    </ol>
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                 }).join('')}

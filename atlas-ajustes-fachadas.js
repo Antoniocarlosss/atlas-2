@@ -180,8 +180,9 @@
         if (ralI) ralI.value = item.ralInferior;
         if (ralS) ralS.value = item.ralSuperior;
 
+        const totalPedido = achado.itens.reduce((a, b) => a + Number(b.totalMetros || 0), 0);
         const metros = document.getElementById("s-metros-serra");
-        if (metros) metros.value = item.metrosUnidade || "";
+        if (metros) metros.value = totalPedido ? totalPedido.toFixed(2) : (item.metrosUnidade || "");
 
         ["acabamentoInferior", "acabamentoSuperior", "espChapaInferior", "espChapaSuperior"].forEach(k => {
             document.getElementById(`atlas-serra-${k}`)?.remove();
@@ -193,7 +194,6 @@
         });
 
         if (info) {
-            const totalPedido = achado.itens.reduce((a, b) => a + Number(b.totalMetros || 0), 0);
             info.innerHTML = `
                 <div style="background:#052e16; color:#86efac; border:1px solid #10b981; border-radius:8px; padding:10px; margin-bottom:10px; font-size:12px;">
                     Pedido encontrado no Plano: <b>${textoSeguroAtlas(item.destino || "-")}</b><br>
@@ -458,6 +458,15 @@
 
             [["LISTA DE PEDIDOS", grupo.pedidos], ["PRODUÇÃO STOCK", grupo.stock]].forEach(([rotulo, itens]) => {
                 if (!itens.length) return;
+                const linhas = rotulo === "LISTA DE PEDIDOS"
+                    ? Object.values(itens.reduce((acc, item) => {
+                        const chave = `${item.desc || "PED: S/N"}|||${item.ralI || ""}|||${item.ralS || ""}|||${item.acabamentoInferior || ""}|||${item.acabamentoSuperior || ""}|||${item.espChapaInferior || ""}|||${item.espChapaSuperior || ""}`;
+                        if (!acc[chave]) acc[chave] = { ...item, qtd: 0, metros: 0 };
+                        acc[chave].qtd += Number(item.qtd || 1);
+                        acc[chave].metros += Number(item.metros || 0) * Number(item.qtd || 1);
+                        return acc;
+                    }, {}))
+                    : itens;
                 htmlConteudo += `
                     <div style="text-align:center; padding:5px; background:#ddd; font-weight:bold; border:2px solid #000; border-top:none; color:#000;">${rotulo}</div>
                     <table style="width:100%; border-collapse:collapse; font-size:13px; color:#000; margin-bottom:10px;">
@@ -469,11 +478,11 @@
                             <th style="border:2px solid #000;">Identificação</th>
                         </tr></thead>
                         <tbody>
-                            ${itens.map(i => `
+                            ${linhas.map(i => `
                                 <tr>
-                                    <td style="border:2px solid #000; text-align:center;">${i.qtd}</td>
-                                    <td style="border:2px solid #000; text-align:center;">${Number(i.metros).toFixed(2)}m</td>
-                                    <td style="border:2px solid #000; text-align:center; font-weight:bold;">${(Number(i.qtd || 1) * Number(i.metros || 0)).toFixed(2)}m</td>
+                                    <td style="border:2px solid #000; text-align:center;">${rotulo === "LISTA DE PEDIDOS" ? "-" : i.qtd}</td>
+                                    <td style="border:2px solid #000; text-align:center;">${rotulo === "LISTA DE PEDIDOS" ? "-" : Number(i.metros).toFixed(2) + "m"}</td>
+                                    <td style="border:2px solid #000; text-align:center; font-weight:bold;">${(rotulo === "LISTA DE PEDIDOS" ? Number(i.metros || 0) : Number(i.qtd || 1) * Number(i.metros || 0)).toFixed(2)}m</td>
                                     <td style="border:2px solid #000; text-align:center;">${textoSeguroAtlas(i.ralI)}/${textoSeguroAtlas(i.ralS)}${detalhesLinhaPDF(i)}</td>
                                     <td style="border:2px solid #000; text-align:center;">${textoSeguroAtlas(i.desc)}</td>
                                 </tr>

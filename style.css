@@ -22,6 +22,10 @@ body {
     overflow-x: hidden; 
 }
 
+img, table {
+    max-width: 100%;
+}
+
 /* --- LOGO PERSONALIZADA --- */
 .logo-container-css {
     display: flex;
@@ -219,6 +223,19 @@ header {
 @media (max-width: 768px) {
     .grid-container { grid-template-columns: 1fr; padding: 15px; }
     .login-box { padding: 40px 25px; width: 95%; }
+    header { gap: 10px; padding: 12px; }
+    .modulo-body { overflow-x: auto; }
+    button, input, select, textarea { min-height: 42px; }
+    [style*="grid-template-columns:1fr 1fr"],
+    [style*="grid-template-columns: 1fr 1fr"],
+    [style*="grid-template-columns:1fr 1fr 1fr"],
+    [style*="grid-template-columns: 1fr 1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .grid-container { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 25px; }
 }
 
 @media (min-width: 1025px) {

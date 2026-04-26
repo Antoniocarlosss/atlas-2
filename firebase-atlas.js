@@ -31,6 +31,7 @@ const atlasFirestore = getFirestore(atlasFirebaseApp);
 
 let atlasFirebaseBloqueado = false;
 let atlasFirebaseTimer = null;
+let atlasFirebaseUltimaAlteracaoLocal = 0;
 
 function atlasFirebaseNomeUsuario() {
     return document.getElementById("user-display")?.innerText || "SEM USUARIO";
@@ -270,6 +271,9 @@ const atlasLocalStorageSetItemOriginal = localStorage.setItem;
 
 localStorage.setItem = function(chave, valor) {
     const resultado = atlasLocalStorageSetItemOriginal.call(localStorage, chave, valor);
+    if (!atlasFirebaseBloqueado && (chave.startsWith("atlas_") || chave === "historicoBobines")) {
+        atlasFirebaseUltimaAlteracaoLocal = Date.now();
+    }
     atlasFirebaseAgendarEnvio(chave);
     return resultado;
 };
@@ -323,6 +327,8 @@ setTimeout(() => {
 }, 1500);
 async function atlasFirebaseAtualizarSemSair() {
     try {
+        if (Date.now() - atlasFirebaseUltimaAlteracaoLocal < 30000) return;
+
         const snap = await getDoc(doc(atlasFirestore, "backups_localstorage", "ultimo_backup"));
         if (!snap.exists()) return;
 
