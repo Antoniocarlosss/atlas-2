@@ -6233,7 +6233,7 @@ window.addEventListener('load', () => {
                 <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:18px; margin-bottom:15px;">
                     <label style="color:#94a3b8; font-size:12px; font-weight:bold;">NÚMERO DA ENCOMENDA / PEDIDO</label>
                     <div style="display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:8px;">
-                        <input id="pesquisa-encomenda-input" type="text" placeholder="Ex: 12345"
+                        <input id="pesquisa-encomenda-input" type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Ex: 12345"
                             onkeydown="if(event.key === 'Enter') pesquisarEncomendaAtlas()"
                             style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
                         <button onclick="pesquisarEncomendaAtlas()"
