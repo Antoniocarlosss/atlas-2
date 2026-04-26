@@ -412,6 +412,95 @@
         atualizarBoxDetalhes("emb-setup", document.getElementById("s-tipo")?.value);
     };
 
+    window.atlasPreencherPedidoEmbalagem = function() {
+        const input = document.getElementById("s-ped");
+        if (!input) return;
+
+        const achado = buscarPedidoPlanoAtlas(input.value);
+        const info = document.getElementById("atlas-info-pedido-emb");
+
+        if (!achado) {
+            if (info) info.innerHTML = "";
+            return;
+        }
+
+        const item = achado.itens[0];
+        const totalPedido = achado.itens.reduce((a, b) => a + Number(b.totalMetros || 0), 0);
+
+        document.getElementById("h-tipo").value = normalizarTipoPainelAtlas(item.tipo);
+        document.getElementById("h-esp").value = item.espessura;
+
+        const titulo = document.querySelector("#container-acao-emb div[style*='border-left'] > div");
+        if (titulo) titulo.innerText = `${normalizarTipoPainelAtlas(item.tipo)} - ${item.espessura}mm`;
+
+        const ralI = document.getElementById("s-ral-i");
+        const ralS = document.getElementById("s-ral-s");
+        if (ralI) ralI.value = item.ralInferior;
+        if (ralS) ralS.value = item.ralSuperior;
+
+        const metros = document.getElementById("s-metros");
+        if (metros) metros.value = totalPedido ? totalPedido.toFixed(2) : (item.metrosUnidade || "");
+
+        ["acabamentoInferior", "acabamentoSuperior", "espChapaInferior", "espChapaSuperior"].forEach(k => {
+            document.getElementById(`atlas-emb-${k}`)?.remove();
+            const hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.id = `atlas-emb-${k}`;
+            hidden.value = item[k] || "";
+            document.getElementById("campos-Embalagem")?.appendChild(hidden);
+        });
+
+        if (info) {
+            info.innerHTML = `
+                <div style="background:#052e16; color:#86efac; border:1px solid #10b981; border-radius:8px; padding:10px; margin-bottom:10px; font-size:12px;">
+                    Pedido encontrado no Plano: <b>${textoSeguroAtlas(item.destino || "-")}</b><br>
+                    ${textoSeguroAtlas(normalizarTipoPainelAtlas(item.tipo))} ${textoSeguroAtlas(item.espessura)}mm |
+                    RAL ${textoSeguroAtlas(item.ralInferior)}/${textoSeguroAtlas(item.ralSuperior)} |
+                    Total pedido: ${totalPedido.toFixed(2)} m
+                    ${detalhesLinhaTela(item)}
+                </div>
+            `;
+        }
+    };
+
+    window.setModoCorte = function(modo) {
+        const container = document.getElementById("campos-Embalagem");
+        if (!container) return;
+        document.getElementById("btn-s-ped").style.background = modo === "pedido" ? "#3b82f6" : "#1e293b";
+        document.getElementById("btn-s-stk").style.background = modo === "stock" ? "#3b82f6" : "#1e293b";
+
+        const rals = `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                <input id="s-ral-i" placeholder="RAL INF" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <input id="s-ral-s" placeholder="RAL SUP" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+            </div>
+        `;
+
+        if (modo === "pedido") {
+            container.innerHTML = `
+                <input type="text" id="s-ped" placeholder="Nº Pedido" oninput="atlasPreencherPedidoEmbalagem()" onchange="atlasPreencherPedidoEmbalagem()" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <div id="atlas-info-pedido-emb"></div>
+                ${rals}
+                <input type="number" id="s-metros" placeholder="Comprimento (m) - pode editar se for parcial" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <button onclick="addLinhaEmbalagem('pedido')" style="width:100%; background:#E31C24; color:white; border:none; padding:12px; border-radius:5px; font-weight:bold;">ADICIONAR</button>
+            `;
+        } else {
+            container.innerHTML = `
+                <select id="s-qualidade" style="width:100%; margin-bottom:10px; padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                    <option value="P1">P1</option><option value="P2">P2</option><option value="Descarte">Descarte</option>
+                </select>
+                ${rals}
+                ${htmlCamposDetalhesPainel("emb-linha", { acabamentoInferior:"Canelada", acabamentoSuperior:"Canelada" })}
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <input type="number" id="s-qtd" placeholder="Qtd" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                    <input type="number" id="s-metros" placeholder="Metros" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                </div>
+                <button onclick="addLinhaEmbalagem('stock')" style="width:100%; background:#E31C24; color:white; border:none; padding:12px; border-radius:5px; font-weight:bold;">ADICIONAR STOCK</button>
+            `;
+            atualizarBoxDetalhes("emb-linha", document.getElementById("h-tipo")?.value);
+        }
+    };
+
     const addLinhaEmbalagemOriginal = window.addLinhaEmbalagem;
     window.addLinhaEmbalagem = function(modo) {
         const antes = db_emb_live.length;
@@ -419,7 +508,14 @@
         if (db_emb_live.length > antes) {
             const item = db_emb_live[db_emb_live.length - 1];
             item.tipo = normalizarTipoPainelAtlas(item.tipo);
-            Object.assign(item, lerDetalhesPainel("emb-setup", item.tipo));
+            if (modo === "pedido") {
+                item.acabamentoInferior = document.getElementById("atlas-emb-acabamentoInferior")?.value || "";
+                item.acabamentoSuperior = document.getElementById("atlas-emb-acabamentoSuperior")?.value || "";
+                item.espChapaInferior = document.getElementById("atlas-emb-espChapaInferior")?.value || "";
+                item.espChapaSuperior = document.getElementById("atlas-emb-espChapaSuperior")?.value || "";
+            } else {
+                Object.assign(item, lerDetalhesPainel("emb-linha", item.tipo));
+            }
             localStorage.setItem("atlas_emb_live", JSON.stringify(db_emb_live));
             atualizarTabelaEmbalagem();
         }
