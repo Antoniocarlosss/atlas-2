@@ -1969,10 +1969,6 @@ function renderizarMenuEmbalagem() {
         </div>
         <div id="container-acao-emb" style="display:none; padding:15px;"></div>
     `;
-
-    if(db_emb_live.length > 0) {
-        iniciarInterfaceCorte();
-    }
 }
 
 // --- 2. GERENCIAMENTO DE INTERFACE ---
