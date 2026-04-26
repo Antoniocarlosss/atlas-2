@@ -207,12 +207,7 @@ let producoesDoDia = []; // Deve ficar no topo do script
             
             <label style="font-size:12px; color:#94a3b8;">TIPO DE PAINEL</label>
             <select id="inj-painel" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
-                <option value="5 Ondas">5 Ondas</option>
-                <option value="Telha Canudo">Telha Canudo</option>
-                <option value="Fachada oculta">Fachada Oculta</option>
-                <option value="Fachada visivel">Fachada visivel</option>
-                <option value="Fachada ondulada">Fachada ondulada</option>
-                <option value="Polipainel">Polipainel</option>
+                ${opcoesTipoPainelHTML()}
             </select>
             
             <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -342,12 +337,7 @@ function editarTudo(id) {
 
             <label style="font-size:12px; color:#94a3b8;">TIPO DE PAINEL</label>
             <select id="inj-painel" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
-                <option value="5 Ondas">5 Ondas</option>
-                <option value="Telha Canudo">Telha Canudo</option>
-                <option value="Fachada oculta">Fachada Oculta</option>
-                <option value="Fachada visivel">Fachada visivel</option>
-                <option value="Fachada ondulada">Fachada ondulada</option>
-                <option value="Polipainel">Polipainel</option>
+                ${opcoesTipoPainelHTML()}
             </select>
 
              <label style="font-size:12px; color:#94a3b8; font-weight:bold;">Velocidade Da Linha</label>
@@ -1534,9 +1524,7 @@ function exibirSetupSerra() {
         <div style="background:#111827; padding:20px; border-radius:12px; border:1px solid #334155;">
             <label style="color:#94a3b8; font-size:11px;">TIPO DE PAINEL</label>
             <select id="s-tipo-serra" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:15px; font-weight:bold;">
-                <option value="5 Ondas">5 Ondas</option>
-                <option value="Fachada">Fachada</option>
-                <option value="Telha Canudo">Telha Canudo</option>
+                ${opcoesTipoPainelHTML()}
             </select>
 
             <label style="color:#94a3b8; font-size:11px;">ESPESSURA (mm)</label>
@@ -2007,9 +1995,7 @@ function exibirSetupEmbalagem() {
         <div style="background:#111827; padding:20px; border-radius:12px; border: 1px solid #334155;">
             <label style="color:#94a3b8; font-size:11px;">TIPO DE PAINEL</label>
             <select id="s-tipo" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:15px; font-weight:bold;">
-                <option value="5 Ondas">5 Ondas</option>
-                <option value="Fachada">Fachada</option>
-                <option value="Telha Canudo">Telha Canudo</option>
+                ${opcoesTipoPainelHTML()}
             </select>
             <label style="color:#94a3b8; font-size:11px;">ESPESSURA (mm)</label>
             <select id="s-esp" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:20px; font-weight:bold;">
@@ -2600,8 +2586,16 @@ var OPCOES_ESPESSURA_PLANO = [30, 40, 50, 60, 80, 100, 120];
 var OPCOES_RAL_SUP = atlasListaConfig('atlas_config_ral_superior', ["9010", "9006", "7016"]);
 var OPCOES_RAL_INF = atlasListaConfig('atlas_config_ral_inferior', ["3009", "9010", "6009", "9006", "9005", "8004 T", "8004 L", "7016"]);
 var OPCOES_ESP_CHAPA = atlasListaConfig('atlas_config_esp_chapa', ["0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"]);
+window.OPCOES_TIPO_PLANO = OPCOES_TIPO_PLANO;
+window.OPCOES_RAL_SUP = OPCOES_RAL_SUP;
+window.OPCOES_RAL_INF = OPCOES_RAL_INF;
+window.OPCOES_ESP_CHAPA = OPCOES_ESP_CHAPA;
 var OPCOES_QUALIDADE = ["P1", "P2", "Descarte"];
 var MESES_PT = ["", "JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+
+function opcoesTipoPainelHTML(selecionado = '') {
+    return (OPCOES_TIPO_PLANO || []).map(v => `<option value="${v}" ${String(selecionado) === String(v) ? 'selected' : ''}>${v}</option>`).join('');
+}
 
 function usuarioPodeCriarPlano() {
     if (!usuarioLogado) return false;
@@ -3772,10 +3766,22 @@ function htmlEditorListaSistema(titulo, chave, lista, variavel) {
 
 function atualizarVariavelListaSistema(variavel, lista) {
     if (variavel === 'destinosPlano') destinosPlano = lista;
-    if (variavel === 'OPCOES_TIPO_PLANO') OPCOES_TIPO_PLANO = lista;
-    if (variavel === 'OPCOES_RAL_INF') OPCOES_RAL_INF = lista;
-    if (variavel === 'OPCOES_RAL_SUP') OPCOES_RAL_SUP = lista;
-    if (variavel === 'OPCOES_ESP_CHAPA') OPCOES_ESP_CHAPA = lista;
+    if (variavel === 'OPCOES_TIPO_PLANO') {
+        OPCOES_TIPO_PLANO = lista;
+        window.OPCOES_TIPO_PLANO = lista;
+    }
+    if (variavel === 'OPCOES_RAL_INF') {
+        OPCOES_RAL_INF = lista;
+        window.OPCOES_RAL_INF = lista;
+    }
+    if (variavel === 'OPCOES_RAL_SUP') {
+        OPCOES_RAL_SUP = lista;
+        window.OPCOES_RAL_SUP = lista;
+    }
+    if (variavel === 'OPCOES_ESP_CHAPA') {
+        OPCOES_ESP_CHAPA = lista;
+        window.OPCOES_ESP_CHAPA = lista;
+    }
 }
 
 function obterVariavelListaSistema(variavel) {

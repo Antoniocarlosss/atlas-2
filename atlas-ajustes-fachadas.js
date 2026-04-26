@@ -7,11 +7,15 @@
     if (window.atlasAjustesFachadas2026Ativo) return;
     window.atlasAjustesFachadas2026Ativo = true;
 
-    const TIPOS_PAINEL_ATLAS = window.OPCOES_TIPO_PLANO || ["5 Ondas", "Fachada Oculta", "Fachada Visível", "Telha Canudo"];
+    const TIPOS_PAINEL_ATLAS_PADRAO = ["5 Ondas", "Fachada Oculta", "Fachada Visível", "Telha Canudo"];
     const ACABAMENTOS_ATLAS = ["Canelada", "Micronervurada", "Lisa"];
     const ESP_CHAPA_ATLAS = ["", ...(window.OPCOES_ESP_CHAPA || ["0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"])];
 
-    window.OPCOES_TIPO_PLANO = TIPOS_PAINEL_ATLAS;
+    function getTiposPainelAtlas() {
+        return window.OPCOES_TIPO_PLANO || TIPOS_PAINEL_ATLAS_PADRAO;
+    }
+
+    window.OPCOES_TIPO_PLANO = getTiposPainelAtlas();
 
     function textoSeguroAtlas(valor) {
         return String(valor ?? "")
@@ -225,7 +229,7 @@
 
         const tipo = document.getElementById("plano-tipo");
         if (tipo) {
-            tipo.innerHTML = TIPOS_PAINEL_ATLAS.map(v => `<option value="${v}">${v}</option>`).join("");
+            tipo.innerHTML = getTiposPainelAtlas().map(v => `<option value="${v}">${v}</option>`).join("");
             tipo.insertAdjacentHTML("afterend", htmlCamposDetalhesPainel("plano", null));
             tipo.addEventListener("change", () => atualizarBoxDetalhes("plano", tipo.value));
             atualizarBoxDetalhes("plano", tipo.value);
@@ -281,7 +285,7 @@
             <div style="background:#111827; padding:20px; border-radius:12px; border:1px solid #334155;">
                 <label style="color:#94a3b8; font-size:11px;">TIPO DE PAINEL</label>
                 <select id="s-tipo-serra" onchange="atualizarBoxDetalhesSerraSetupAtlas()" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:15px; font-weight:bold;">
-                    ${TIPOS_PAINEL_ATLAS.map(v => `<option value="${v}">${v}</option>`).join("")}
+                    ${getTiposPainelAtlas().map(v => `<option value="${v}">${v}</option>`).join("")}
                 </select>
                 <label style="color:#94a3b8; font-size:11px;">ESPESSURA (mm)</label>
                 <select id="s-esp-serra" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:10px; font-weight:bold;">
@@ -409,7 +413,7 @@
             <div style="background:#111827; padding:20px; border-radius:12px; border:1px solid #334155;">
                 <label style="color:#94a3b8; font-size:11px;">TIPO DE PAINEL</label>
                 <select id="s-tipo" onchange="atualizarBoxDetalhesEmbSetupAtlas()" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:15px; font-weight:bold;">
-                    ${TIPOS_PAINEL_ATLAS.map(v => `<option value="${v}">${v}</option>`).join("")}
+                    ${getTiposPainelAtlas().map(v => `<option value="${v}">${v}</option>`).join("")}
                 </select>
                 <label style="color:#94a3b8; font-size:11px;">ESPESSURA (mm)</label>
                 <select id="s-esp" style="background:#1e293b; color:white; border:1px solid #334155; width:100%; padding:12px; border-radius:6px; margin-bottom:10px; font-weight:bold;">

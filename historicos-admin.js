@@ -129,7 +129,7 @@ function atlasRenderGerirInjecao(ano, mes, index, modulo, rel) {
 }
 
 function atlasFormItemInjecao(item, titulo, salvarJS, voltarJS) {
-    const paineis = ["5 Ondas", "Telha Canudo", "Fachada oculta", "Fachada visivel", "Fachada ondulada", "Polipainel"];
+    const paineis = window.OPCOES_TIPO_PLANO || ["5 Ondas", "Telha Canudo", "Fachada oculta", "Fachada visivel", "Fachada ondulada", "Polipainel"];
     const esp = [30,40,50,60,80,100,120];
     const vels = ["5 m/min","6 m/min","8 m/min","9 m/min","10 m/min","11 m/min","12 m/min"];
     return `
@@ -517,7 +517,7 @@ function atlasRenderGerirCorte(tipo, index, rel) {
 
 function atlasFormCorte(tipo, index, item, titulo, salvarJS) {
     const cfg = atlasGetStoreCorte(tipo);
-    const tipos = ["5 Ondas", "Fachada", "Telha Canudo"];
+    const tipos = window.OPCOES_TIPO_PLANO || ["5 Ondas", "Fachada", "Telha Canudo"];
     const esp = [30,40,50,60,80,100,120];
     return `
         <div style="max-width:520px; margin:0 auto; background:#020617; min-height:100%; border-radius:14px; border:1px solid #334155; padding:14px;">
