@@ -4924,6 +4924,34 @@ function textoSeguroConferencia(valor) {
         .replace(/'/g, '&#039;');
 }
 
+function obterNomeConferenteSerra() {
+    return document.getElementById('user-display')?.innerText || usuarioLogado?.nome || usuarioLogado?.id || 'SEM USUARIO';
+}
+
+function motivosUnidadeConferenciaSerra(unidade) {
+    if (Array.isArray(unidade.motivos)) return unidade.motivos.filter(Boolean);
+    return unidade.observacao ? [unidade.observacao] : [];
+}
+
+function atualizarStatusPedidoConferenciaSerra(pedido) {
+    if (!pedido || pedido.status === 'finalizado') return;
+
+    const temNaoOk = (pedido.unidades || []).some(u => u.status === 'nao');
+    pedido.status = temNaoOk ? 'stand_by' : 'aberto';
+}
+
+function textoStatusPedidoConferenciaSerra(status) {
+    if (status === 'finalizado') return 'OK';
+    if (status === 'stand_by') return 'STAND BY';
+    return 'ABERTO';
+}
+
+function corStatusPedidoConferenciaSerra(status) {
+    if (status === 'finalizado') return '#10b981';
+    if (status === 'stand_by') return '#ef4444';
+    return '#f59e0b';
+}
+
 function extrairNumeroPedidoSerra(desc) {
     const texto = String(desc || '');
     const match = texto.match(/PED:\s*(.+)/i);
@@ -4964,6 +4992,7 @@ function registrarPedidosSerraParaConferencia(itens, meta) {
                 conferidoPor: '',
                 conferidoEm: '',
                 observacao: '',
+                motivos: [],
                 tipo: item.tipo,
                 esp: item.esp,
                 ralI: item.ralI,
@@ -5059,8 +5088,9 @@ function renderizarMenuConferenciaSerra() {
             Object.keys(agrupado[ano][mes]).sort((a,b) => b-a).forEach(dia => {
                 const pedidosDia = agrupado[ano][mes][dia];
                 const diaFinalizado = pedidosDia.every(p => p.status === 'finalizado');
-                const corDia = diaFinalizado ? '#10b981' : '#f59e0b';
-                const textoDia = diaFinalizado ? 'FINALIZADO' : 'EM ABERTO';
+                const diaStandBy = pedidosDia.some(p => p.status === 'stand_by');
+                const corDia = diaFinalizado ? '#10b981' : (diaStandBy ? '#ef4444' : '#f59e0b');
+                const textoDia = diaFinalizado ? 'FINALIZADO' : (diaStandBy ? 'STAND BY' : 'EM ABERTO');
 
                 html += `
                     <div style="background:#111827; border:1px solid #334155; border-left:5px solid ${corDia}; border-radius:8px; margin-bottom:10px; overflow:hidden;">
@@ -5075,8 +5105,8 @@ function renderizarMenuConferenciaSerra() {
                                         <b>PEDIDO ${textoSeguroConferencia(pedido.pedidoNumero)}</b><br>
                                         <small style="color:#94a3b8;">${pedido.unidades.length} unidade(s)</small>
                                     </span>
-                                    <span style="color:${pedido.status === 'finalizado' ? '#10b981' : '#f59e0b'}; font-weight:bold; font-size:11px;">
-                                        ${pedido.status === 'finalizado' ? 'OK' : 'ABERTO'}
+                                    <span style="color:${corStatusPedidoConferenciaSerra(pedido.status)}; font-weight:bold; font-size:11px;">
+                                        ${textoStatusPedidoConferenciaSerra(pedido.status)}
                                     </span>
                                 </button>
                             `).join('')}
@@ -5111,7 +5141,12 @@ function abrirPedidoConferenciaSerra(idPedido) {
             </button>
 
             <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:15px; margin-bottom:15px;">
-                <h2 style="margin:0 0 8px 0; font-size:18px;">PEDIDO ${textoSeguroConferencia(pedido.pedidoNumero)}</h2>
+                <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+                    <h2 style="margin:0 0 8px 0; font-size:18px;">PEDIDO ${textoSeguroConferencia(pedido.pedidoNumero)}</h2>
+                    <span style="background:${corStatusPedidoConferenciaSerra(pedido.status)}; color:white; padding:6px 10px; border-radius:8px; font-size:11px; font-weight:bold;">
+                        ${textoStatusPedidoConferenciaSerra(pedido.status)}
+                    </span>
+                </div>
                 <div style="color:#94a3b8; font-size:12px;">
                     Data Serra: ${pedido.data}<br>
                     Operador Serra: ${textoSeguroConferencia(pedido.operadorSerra)}
@@ -5128,11 +5163,17 @@ function abrirPedidoConferenciaSerra(idPedido) {
                         Finalizado por ${textoSeguroConferencia(pedido.finalizadoPor)} em ${textoSeguroConferencia(pedido.finalizadoEm)}
                     </div>
                 ` : ''}
+                ${pedido.status === 'stand_by' ? `
+                    <div style="margin-top:10px; background:#450a0a; color:#fca5a5; padding:10px; border-radius:8px; font-size:12px;">
+                        Pedido em stand by: existe pelo menos uma unidade marcada como NAO OK. Corrija os problemas e marque todas as unidades como OK para finalizar.
+                    </div>
+                ` : ''}
             </div>
 
             ${pedido.unidades.map((unidade, idx) => {
                 const cor = unidade.status === 'ok' ? '#10b981' : unidade.status === 'nao' ? '#ef4444' : '#f59e0b';
                 const textoStatus = unidade.status === 'ok' ? 'OK' : unidade.status === 'nao' ? 'NÃO OK' : 'PENDENTE';
+                const motivos = motivosUnidadeConferenciaSerra(unidade);
 
                 return `
                     <div style="background:#111827; border:1px solid #334155; border-left:5px solid ${cor}; border-radius:10px; padding:12px; margin-bottom:10px;">
@@ -5149,7 +5190,20 @@ function abrirPedidoConferenciaSerra(idPedido) {
                             </span>
                         </div>
 
-                        ${unidade.observacao ? `<div style="color:#fca5a5; font-size:12px; margin-top:8px;">Obs: ${textoSeguroConferencia(unidade.observacao)}</div>` : ''}
+                        ${unidade.conferidoPor ? `
+                            <div style="color:#94a3b8; font-size:12px; margin-top:8px;">
+                                Conferido por: <b style="color:white;">${textoSeguroConferencia(unidade.conferidoPor)}</b> em ${textoSeguroConferencia(unidade.conferidoEm || '-')}
+                            </div>
+                        ` : ''}
+
+                        ${motivos.length ? `
+                            <div style="color:#fca5a5; font-size:12px; margin-top:8px;">
+                                <b>Motivos:</b>
+                                <ol style="margin:6px 0 0 18px; padding:0;">
+                                    ${motivos.map(motivo => `<li>${textoSeguroConferencia(motivo)}</li>`).join('')}
+                                </ol>
+                            </div>
+                        ` : ''}
 
                         ${pedido.status !== 'finalizado' ? `
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
@@ -5160,12 +5214,21 @@ function abrirPedidoConferenciaSerra(idPedido) {
                                     NÃO OK
                                 </button>
                             </div>
+                            ${unidade.status === 'nao' ? `
+                                <button onclick="adicionarMotivoConferenciaSerra(${pedido.id}, ${unidade.id})" style="width:100%; background:#334155; color:white; border:1px solid #475569; padding:10px; border-radius:8px; font-weight:bold; margin-top:8px;">
+                                    + ADICIONAR MOTIVO
+                                </button>
+                            ` : ''}
                         ` : ''}
                     </div>
                 `;
             }).join('')}
 
-            ${pedido.status !== 'finalizado' ? `
+            ${pedido.status === 'stand_by' ? `
+                <button disabled style="width:100%; background:#450a0a; color:#fca5a5; border:1px solid #ef4444; padding:15px; border-radius:10px; font-weight:bold; margin-top:10px; opacity:0.9;">
+                    PEDIDO EM STAND BY
+                </button>
+            ` : pedido.status !== 'finalizado' ? `
                 <button onclick="finalizarPedidoConferenciaSerra(${pedido.id})" style="width:100%; background:#10b981; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; margin-top:10px;">
                     FINALIZAR PEDIDO
                 </button>
@@ -5181,15 +5244,50 @@ function marcarUnidadeConferenciaSerra(idPedido, idUnidade, status) {
     const unidade = pedido.unidades.find(u => String(u.id) === String(idUnidade));
     if (!unidade) return;
 
-    unidade.status = status;
-    unidade.conferidoPor = document.getElementById('user-display')?.innerText || usuarioLogado?.id || 'SEM USUARIO';
-    unidade.conferidoEm = new Date().toLocaleString('pt-BR');
-
     if (status === 'nao') {
-        unidade.observacao = prompt('Motivo / observação:', unidade.observacao || '') || '';
+        const motivo = prompt('Motivo / observacao:', motivosUnidadeConferenciaSerra(unidade)[0] || '');
+
+        if (!motivo || !motivo.trim()) {
+            alert('Informe o motivo para marcar como NAO OK.');
+            return;
+        }
+
+        unidade.motivos = [motivo.trim()];
+        unidade.observacao = motivo.trim();
     } else {
+        unidade.motivos = [];
         unidade.observacao = '';
     }
+
+    unidade.status = status;
+    unidade.conferidoPor = obterNomeConferenteSerra();
+    unidade.conferidoEm = new Date().toLocaleString('pt-BR');
+    atualizarStatusPedidoConferenciaSerra(pedido);
+
+    salvarConferenciaSerra();
+    abrirPedidoConferenciaSerra(idPedido);
+}
+
+function adicionarMotivoConferenciaSerra(idPedido, idUnidade) {
+    const pedido = db_conferencia_serra.find(p => String(p.id) === String(idPedido));
+    if (!pedido || pedido.status === 'finalizado') return;
+
+    const unidade = pedido.unidades.find(u => String(u.id) === String(idUnidade));
+    if (!unidade || unidade.status !== 'nao') return;
+
+    const motivo = prompt('Mais um motivo / problema:');
+
+    if (!motivo || !motivo.trim()) {
+        alert('Informe o motivo para adicionar.');
+        return;
+    }
+
+    unidade.motivos = motivosUnidadeConferenciaSerra(unidade);
+    unidade.motivos.push(motivo.trim());
+    unidade.observacao = unidade.motivos.join(' | ');
+    unidade.conferidoPor = obterNomeConferenteSerra();
+    unidade.conferidoEm = new Date().toLocaleString('pt-BR');
+    atualizarStatusPedidoConferenciaSerra(pedido);
 
     salvarConferenciaSerra();
     abrirPedidoConferenciaSerra(idPedido);
@@ -5200,9 +5298,18 @@ function finalizarPedidoConferenciaSerra(idPedido) {
     if (!pedido) return;
 
     const pendentes = pedido.unidades.filter(u => u.status === 'pendente').length;
+    const naoOk = pedido.unidades.filter(u => u.status === 'nao').length;
 
     if (pendentes > 0) {
         alert(`Ainda existem ${pendentes} unidade(s) pendente(s). Marque OK ou NÃO OK antes de finalizar.`);
+        return;
+    }
+
+    if (naoOk > 0) {
+        pedido.status = 'stand_by';
+        salvarConferenciaSerra();
+        alert(`Este pedido tem ${naoOk} unidade(s) NAO OK e ficara em stand by. Corrija os problemas antes de finalizar.`);
+        abrirPedidoConferenciaSerra(idPedido);
         return;
     }
 
@@ -5210,7 +5317,7 @@ function finalizarPedidoConferenciaSerra(idPedido) {
     if (!confirmar) return;
 
     pedido.status = 'finalizado';
-    pedido.finalizadoPor = document.getElementById('user-display')?.innerText || usuarioLogado?.id || 'SEM USUARIO';
+    pedido.finalizadoPor = obterNomeConferenteSerra();
     pedido.finalizadoEm = new Date().toLocaleString('pt-BR');
 
     salvarConferenciaSerra();
@@ -5816,7 +5923,16 @@ document.addEventListener('click', function(evento) {
         }
 
         const confFinalizada = conferencias.some(c => c.status === 'finalizado');
+        const confStandBy = conferencias.some(c => c.status === 'stand_by' || (c.unidades || []).some(u => u.status === 'nao'));
         const confAberta = conferencias.some(c => c.status !== 'finalizado');
+
+        if (confStandBy) {
+            return {
+                texto: 'STAND BY',
+                cor: '#ef4444',
+                detalhe: 'A conferencia encontrou problema no pedido. Ele nao pode ser finalizado ate a correcao.'
+            };
+        }
 
         if (confAberta) {
             return {
@@ -5968,13 +6084,15 @@ document.addEventListener('click', function(evento) {
                     const ok = (conf.unidades || []).filter(u => u.status === 'ok').length;
                     const nao = (conf.unidades || []).filter(u => u.status === 'nao').length;
                     const pendente = (conf.unidades || []).filter(u => u.status === 'pendente').length;
+                    const statusConfTexto = conf.status === 'finalizado' ? 'OK' : (conf.status === 'stand_by' ? 'STAND BY' : 'FALTA CONFERIR');
+                    const statusConfCor = conf.status === 'finalizado' ? '#10b981' : (conf.status === 'stand_by' ? '#ef4444' : '#f59e0b');
 
                     return `
                         <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:8px;">
                             <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-                                <b>${conf.status === 'finalizado' ? 'Finalizada' : 'Em aberto'}</b>
-                                <span style="color:${conf.status === 'finalizado' ? '#10b981' : '#f59e0b'}; font-weight:bold;">
-                                    ${conf.status === 'finalizado' ? 'OK' : 'FALTA CONFERIR'}
+                                <b>${conf.status === 'finalizado' ? 'Finalizada' : (conf.status === 'stand_by' ? 'Stand by' : 'Em aberto')}</b>
+                                <span style="color:${statusConfCor}; font-weight:bold;">
+                                    ${statusConfTexto}
                                 </span>
                             </div>
                             <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
