@@ -44,7 +44,7 @@ function obterPreferenciasUsuario(idUsuario) {
 
     return {
         tema: salvas.tema || 'escuro',
-        modulosVisiveis: [...new Set([...modulosSalvos, 'lixeira'])]
+        modulosVisiveis: [...new Set([...modulosSalvos, 'stock', 'lixeira'])]
     };
 }
 
@@ -992,7 +992,7 @@ function baixarStockPorLancamentosBobines(itens) {
             if (!bobina) return;
 
             bobina.qtd = Math.max(0, Number(bobina.qtd || 0) - 1);
-            if (bobina.qtd === 0 || item.status === 'SIM') bobina.status = 'fechada';
+            bobina.status = item.status === 'SIM' || bobina.qtd === 0 ? 'fechada' : 'andamento';
             bobina.ultimaBaixaPor = usuario;
             bobina.ultimaBaixaEm = agora;
             alterou = true;
@@ -2651,11 +2651,15 @@ var OPCOES_RAL_SUP = atlasListaConfig('atlas_config_ral_superior', ["9010", "900
 var OPCOES_RAL_INF = atlasListaConfig('atlas_config_ral_inferior', ["3009", "9010", "6009", "9006", "9005", "8004 T", "8004 L", "7016"]);
 var OPCOES_ESP_CHAPA = atlasListaConfig('atlas_config_esp_chapa', ["0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"]);
 var OPCOES_ESPUMA_INJECAO = atlasListaConfig('atlas_config_espuma_injecao', ["30 mm", "35 mm", "40 mm", "50 mm", "65 mm ADH"]);
+var OPCOES_MEDIDAS_CHAPA_STOCK = atlasListaConfig('atlas_config_medidas_chapa_stock', ["1265", "1060", "1163", "1065"]);
+var OPCOES_FORNECEDORES_STOCK = atlasListaConfig('atlas_config_fornecedores_stock', ["Fornecedor X", "Fornecedor Y"]);
 window.OPCOES_TIPO_PLANO = OPCOES_TIPO_PLANO;
 window.OPCOES_RAL_SUP = OPCOES_RAL_SUP;
 window.OPCOES_RAL_INF = OPCOES_RAL_INF;
 window.OPCOES_ESP_CHAPA = OPCOES_ESP_CHAPA;
 window.OPCOES_ESPUMA_INJECAO = OPCOES_ESPUMA_INJECAO;
+window.OPCOES_MEDIDAS_CHAPA_STOCK = OPCOES_MEDIDAS_CHAPA_STOCK;
+window.OPCOES_FORNECEDORES_STOCK = OPCOES_FORNECEDORES_STOCK;
 var OPCOES_QUALIDADE = ["P1", "P2", "Descarte"];
 var MESES_PT = ["", "JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
 
@@ -3817,6 +3821,8 @@ function abrirAjustesSistema() {
             ${htmlEditorListaSistema('RAL superior', 'atlas_config_ral_superior', OPCOES_RAL_SUP, 'OPCOES_RAL_SUP')}
             ${htmlEditorListaSistema('Espessura de chapa opcional', 'atlas_config_esp_chapa', OPCOES_ESP_CHAPA, 'OPCOES_ESP_CHAPA')}
             ${htmlEditorListaSistema('Espessura da espuma - Injeção', 'atlas_config_espuma_injecao', OPCOES_ESPUMA_INJECAO, 'OPCOES_ESPUMA_INJECAO')}
+            ${htmlEditorListaSistema('Medidas de chapa - Stock', 'atlas_config_medidas_chapa_stock', OPCOES_MEDIDAS_CHAPA_STOCK, 'OPCOES_MEDIDAS_CHAPA_STOCK')}
+            ${htmlEditorListaSistema('Fornecedores - Stock', 'atlas_config_fornecedores_stock', OPCOES_FORNECEDORES_STOCK, 'OPCOES_FORNECEDORES_STOCK')}
         </div>
     `;
 }
@@ -3864,6 +3870,14 @@ function atualizarVariavelListaSistema(variavel, lista) {
         OPCOES_ESPUMA_INJECAO = lista;
         window.OPCOES_ESPUMA_INJECAO = lista;
     }
+    if (variavel === 'OPCOES_MEDIDAS_CHAPA_STOCK') {
+        OPCOES_MEDIDAS_CHAPA_STOCK = lista;
+        window.OPCOES_MEDIDAS_CHAPA_STOCK = lista;
+    }
+    if (variavel === 'OPCOES_FORNECEDORES_STOCK') {
+        OPCOES_FORNECEDORES_STOCK = lista;
+        window.OPCOES_FORNECEDORES_STOCK = lista;
+    }
 }
 
 function obterVariavelListaSistema(variavel) {
@@ -3873,6 +3887,8 @@ function obterVariavelListaSistema(variavel) {
     if (variavel === 'OPCOES_RAL_SUP') return OPCOES_RAL_SUP;
     if (variavel === 'OPCOES_ESP_CHAPA') return OPCOES_ESP_CHAPA;
     if (variavel === 'OPCOES_ESPUMA_INJECAO') return OPCOES_ESPUMA_INJECAO;
+    if (variavel === 'OPCOES_MEDIDAS_CHAPA_STOCK') return OPCOES_MEDIDAS_CHAPA_STOCK;
+    if (variavel === 'OPCOES_FORNECEDORES_STOCK') return OPCOES_FORNECEDORES_STOCK;
     return [];
 }
 
@@ -6092,6 +6108,18 @@ function grupoFornecedorStock(lista) {
     }, {});
 }
 
+function grupoFornecedorMedidaRalStock(lista) {
+    return (lista || []).reduce((acc, item) => {
+        const fornecedor = item.fornecedor || 'SEM FORNECEDOR';
+        const medida = item.medida || 'SEM MEDIDA';
+        const ral = item.ral || 'SEM RAL';
+        const chave = `${fornecedor}|||${medida}|||${ral}`;
+        if (!acc[chave]) acc[chave] = { fornecedor, medida, ral, itens: [] };
+        acc[chave].itens.push(item);
+        return acc;
+    }, {});
+}
+
 function renderizarStockBobinasAtlas() {
     atlasStockBobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
     const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
@@ -6104,11 +6132,12 @@ function renderizarStockBobinasAtlas() {
     c.innerHTML = `
         <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
             <h3 style="margin-top:0;">Bobinas</h3>
-            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; margin-bottom:12px;">
+            <div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:8px; margin-bottom:12px;">
                 <input id="stock-bob-num" placeholder="Nº bobina" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
                 <select id="stock-bob-ral" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${OPCOES_RAL_INF.concat(OPCOES_RAL_SUP).filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
+                <select id="stock-bob-medida" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_MEDIDAS_CHAPA_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <input id="stock-bob-esp" placeholder="Espessura" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
-                <input id="stock-bob-forn" placeholder="Fornecedor" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <select id="stock-bob-forn" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_FORNECEDORES_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <input id="stock-bob-qtd" type="number" value="1" min="1" placeholder="Qtd" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
             </div>
             <button onclick="cadastrarBobinaStockAtlas()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">CADASTRAR BOBINA</button>
@@ -6123,13 +6152,17 @@ function renderizarStockBobinasAtlas() {
 
 function renderizarListaBobinasStock(lista, fechadas) {
     if (!lista.length) return `<div style="color:#94a3b8; padding:12px;">Nenhuma bobina ${fechadas ? 'fechada' : 'em andamento'}.</div>`;
-    const grupos = grupoFornecedorStock(lista);
-    return Object.keys(grupos).sort().map(forn => `
+    const grupos = grupoFornecedorMedidaRalStock(lista);
+    return Object.keys(grupos).sort().map(chave => {
+        const grupo = grupos[chave];
+        return `
         <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; margin-bottom:10px; overflow:hidden;">
-            <div style="padding:10px; font-weight:bold; color:white; background:#0f172a;">${textoSeguroConferencia(forn)}</div>
-            ${grupos[forn].map(item => `
+            <div style="padding:10px; font-weight:bold; color:white; background:#0f172a;">
+                ${textoSeguroConferencia(grupo.fornecedor)} | Medida ${textoSeguroConferencia(grupo.medida)} | RAL ${textoSeguroConferencia(grupo.ral)}
+            </div>
+            ${grupo.itens.map(item => `
                 <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px; border-top:1px solid #334155; flex-wrap:wrap;">
-                    <span><b>Bobina ${textoSeguroConferencia(item.numero)}</b><br><small style="color:#94a3b8;">RAL ${textoSeguroConferencia(item.ral)} | Esp. ${textoSeguroConferencia(item.espessura || '-')}</small></span>
+                    <span><b>Bobina ${textoSeguroConferencia(item.numero)}</b><br><small style="color:#94a3b8;">Medida ${textoSeguroConferencia(item.medida || '-')} | RAL ${textoSeguroConferencia(item.ral)} | Esp. ${textoSeguroConferencia(item.espessura || '-')}</small></span>
                     <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
                     <div style="display:flex; gap:8px;">
                         ${item.status !== 'fechada' ? `<button onclick="baixarBobinaStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button><button onclick="fecharBobinaStockAtlas('${item.id}')" style="background:#64748b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">FECHAR</button>` : ''}
@@ -6137,17 +6170,19 @@ function renderizarListaBobinasStock(lista, fechadas) {
                 </div>
             `).join('')}
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function cadastrarBobinaStockAtlas() {
     const numero = document.getElementById('stock-bob-num')?.value.trim();
     const ral = document.getElementById('stock-bob-ral')?.value;
+    const medida = document.getElementById('stock-bob-medida')?.value;
     const espessura = document.getElementById('stock-bob-esp')?.value.trim();
     const fornecedor = document.getElementById('stock-bob-forn')?.value.trim();
     const qtd = Number(document.getElementById('stock-bob-qtd')?.value || 1);
-    if (!numero || !ral || !fornecedor) return alert('Informe número, RAL e fornecedor.');
-    atlasStockBobinas.unshift({ id: String(Date.now()), numero, ral, espessura, fornecedor, qtd, status: 'andamento', criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
+    if (!numero || !ral || !medida || !fornecedor) return alert('Informe numero, RAL, medida e fornecedor.');
+    atlasStockBobinas.unshift({ id: String(Date.now()), numero, ral, medida, espessura, fornecedor, qtd, status: 'andamento', criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
     salvarStockAtlas();
     renderizarStockBobinasAtlas();
 }
@@ -6184,7 +6219,7 @@ function renderizarStockFilmesAtlas() {
             <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
                 <select id="stock-film-tipo" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${tipos.map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <input id="stock-film-medida" placeholder="Medida" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
-                <input id="stock-film-forn" placeholder="Fornecedor" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <select id="stock-film-forn" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_FORNECEDORES_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <input id="stock-film-qtd" type="number" value="1" min="1" placeholder="Qtd" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
             </div>
             <button onclick="cadastrarFilmeStockAtlas()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">CADASTRAR FILME</button>
