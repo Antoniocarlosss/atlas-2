@@ -2649,7 +2649,9 @@ var OPCOES_TIPO_PLANO = atlasListaConfig('atlas_config_tipos_painel', ["5 Ondas"
 var OPCOES_ESPESSURA_PLANO = [30, 40, 50, 60, 80, 100, 120];
 var OPCOES_RAL_SUP = atlasListaConfig('atlas_config_ral_superior', ["9010", "9006", "7016"]);
 var OPCOES_RAL_INF = atlasListaConfig('atlas_config_ral_inferior', ["3009", "9010", "6009", "9006", "9005", "8004 T", "8004 L", "7016"]);
-var OPCOES_ESP_CHAPA = atlasListaConfig('atlas_config_esp_chapa', ["0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"]);
+var OPCOES_ESP_CHAPA = atlasListaConfig('atlas_config_esp_chapa', ["0,28", "0,30", "0,32", "0,35", "0,38", "0,40", "0,43", "0,45", "0,50", "0,60", "0,68"])
+    .map(v => String(v).replace('.', ','));
+atlasSalvarListaConfig('atlas_config_esp_chapa', OPCOES_ESP_CHAPA);
 var OPCOES_ESPUMA_INJECAO = atlasListaConfig('atlas_config_espuma_injecao', ["30 mm", "35 mm", "40 mm", "50 mm", "65 mm ADH"]);
 var OPCOES_MEDIDAS_CHAPA_STOCK = atlasListaConfig('atlas_config_medidas_chapa_stock', ["1265", "1060", "1163", "1065"]);
 var OPCOES_FORNECEDORES_STOCK = atlasListaConfig('atlas_config_fornecedores_stock', ["Fornecedor X", "Fornecedor Y"]);
@@ -2671,6 +2673,13 @@ function opcoesEspumaInjecaoHTML(selecionado = '') {
     return [`<option value="">Espuma opcional</option>`]
         .concat((OPCOES_ESPUMA_INJECAO || []).map(v => `<option value="${v}" ${String(selecionado) === String(v) ? 'selected' : ''}>${v}</option>`))
         .join('');
+}
+
+function opcoesEspChapaHTML(selecionado = '') {
+    return (OPCOES_ESP_CHAPA || []).map(v => {
+        const valor = String(v).replace('.', ',');
+        return `<option value="${valor}" ${String(selecionado).replace('.', ',') === valor ? 'selected' : ''}>${valor}</option>`;
+    }).join('');
 }
 
 function espumaPadraoInjecao(tipoPainel) {
@@ -6137,7 +6146,7 @@ function renderizarStockBobinasAtlas() {
                 <select id="stock-bob-ral" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${OPCOES_RAL_INF.concat(OPCOES_RAL_SUP).filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <select id="stock-bob-medida" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_MEDIDAS_CHAPA_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <select id="stock-bob-esp" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
-                    ${(OPCOES_ESP_CHAPA || []).map(v=>`<option value="${v}">${String(v).replace('.', ',')}</option>`).join('')}
+                    ${opcoesEspChapaHTML()}
                 </select>
                 <select id="stock-bob-forn" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_FORNECEDORES_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <input id="stock-bob-qtd" type="number" value="1" min="1" placeholder="Qtd" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
