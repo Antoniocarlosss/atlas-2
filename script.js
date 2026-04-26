@@ -858,13 +858,10 @@ function setLado(lado) {
     } else {
         areaDet.innerHTML = `
             <input type="text" id="num_bobine" placeholder="Nº DA BOBINA" class="input-style">
+            <div id="info-bobine-stock"></div>
             <select id="ral_chapa" class="input-style">
                 <option value="">SELECIONE O RAL</option>
-                <option value="3009">3009</option>
-                <option value="9010">9010</option>
-                <option value="7016">7016</option>
-                <option value="9006">9006</option>
-                <option value="6009">6009</option>
+                ${OPCOES_RAL_INF.concat(OPCOES_RAL_SUP).filter((v,i,a)=>a.indexOf(v)===i).map(v => `<option value="${v}">${v}</option>`).join('')}
             </select>
             <label style="color:#94a3b8; font-size:12px;">ACABOU?</label>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px; margin-top:5px;">
@@ -873,6 +870,11 @@ function setLado(lado) {
                 <button onclick="setStatusForm('ANDAMENTO')" class="btn-opt btn-status">ANDAMENTO</button>
             </div>
         `;
+        const inputBobine = document.getElementById('num_bobine');
+        if (inputBobine) {
+            inputBobine.addEventListener('input', preencherInfoBobinaLancamento);
+            inputBobine.addEventListener('change', preencherInfoBobinaLancamento);
+        }
     }
 }
 
@@ -886,6 +888,47 @@ function setStatusForm(status) {
     document.querySelectorAll('.btn-status').forEach(b => b.classList.toggle('active', b.innerText === status));
 }
 
+function buscarBobinaStockPorNumero(numero) {
+    const alvo = normalizarStockAtlas(numero);
+    if (!alvo) return null;
+    const bobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
+    return bobinas.find(b => b.status !== 'acabada_mes' && normalizarStockAtlas(b.numero) === alvo) || null;
+}
+
+function preencherInfoBobinaLancamento() {
+    const numero = document.getElementById('num_bobine')?.value;
+    const info = document.getElementById('info-bobine-stock');
+    const ralSelect = document.getElementById('ral_chapa');
+    const bobina = buscarBobinaStockPorNumero(numero);
+
+    if (!info) return;
+    if (!bobina) {
+        info.innerHTML = numero ? `
+            <div style="background:#451a03; color:#fed7aa; border:1px solid #f97316; border-radius:8px; padding:10px; margin-bottom:12px; font-size:12px;">
+                Bobina nao encontrada no Stock. Confira o numero ou cadastre antes.
+            </div>
+        ` : '';
+        return;
+    }
+
+    if (ralSelect) ralSelect.value = bobina.ral || '';
+    lancamentoAtual.ral = bobina.ral || '';
+    lancamentoAtual.medida = bobina.medida || '';
+    lancamentoAtual.espessura = bobina.espessura || '';
+    lancamentoAtual.fornecedor = bobina.fornecedor || '';
+
+    info.innerHTML = `
+        <div style="background:#052e16; color:#bbf7d0; border:1px solid #10b981; border-radius:8px; padding:10px; margin-bottom:12px; font-size:12px;">
+            <b>Bobina encontrada no Stock</b><br>
+            Fornecedor: ${textoSeguroConferencia(bobina.fornecedor || '-')} |
+            Medida: ${textoSeguroConferencia(bobina.medida || '-')} |
+            RAL: ${textoSeguroConferencia(bobina.ral || '-')} |
+            Esp.: ${textoSeguroConferencia(bobina.espessura || '-')} |
+            Qtd: ${Number(bobina.qtd || 0)} un.
+        </div>
+    `;
+}
+
 function adicionarAoLancamento() {
     if(!lancamentoAtual.lado) { alert('Selecione a posição!'); return; }
 
@@ -894,6 +937,15 @@ function adicionarAoLancamento() {
     } else {
         lancamentoAtual.numBobine = document.getElementById('num_bobine').value;
         lancamentoAtual.ral = document.getElementById('ral_chapa').value;
+        const bobinaStock = buscarBobinaStockPorNumero(lancamentoAtual.numBobine);
+        if (bobinaStock) {
+            lancamentoAtual.ral = bobinaStock.ral || lancamentoAtual.ral;
+            lancamentoAtual.medida = bobinaStock.medida || '';
+            lancamentoAtual.espessura = bobinaStock.espessura || '';
+            lancamentoAtual.fornecedor = bobinaStock.fornecedor || '';
+            const ralSelect = document.getElementById('ral_chapa');
+            if (ralSelect) ralSelect.value = lancamentoAtual.ral;
+        }
         if(!lancamentoAtual.numBobine || !lancamentoAtual.ral || !lancamentoAtual.status) {
             alert('Preencha todos os campos!'); return;
         }
@@ -924,7 +976,7 @@ function atualizarLista() {
             <div class="item-lancado">
                 <div style="font-size:11px;">
                     <b>${item.tipo.toUpperCase()} ${item.lado.toUpperCase()}</b><br>
-                    ${item.tipo === 'filme' ? 'Tipo: '+item.subtipo+' | Qtd: '+item.qtd : 'Bob: '+item.numBobine+' | RAL: '+item.ral}<br>
+                    ${item.tipo === 'filme' ? 'Tipo: '+item.subtipo+' | Qtd: '+item.qtd : 'Bob: '+item.numBobine+' | RAL: '+item.ral + (item.medida ? ' | Medida: '+item.medida : '') + (item.espessura ? ' | Esp.: '+item.espessura : '')}<br>
                     ${item.tipo === 'chapa' ? `<span onclick="alternarStatus(${index})" class="badge-status" style="background:${corStatus}">${item.status}</span>` : ''}
                 </div>
                 <button onclick="removerLancamento(${index})" style="background:transparent; border:none; color:#ff4444; cursor:pointer;"><i class="fas fa-trash"></i></button>
