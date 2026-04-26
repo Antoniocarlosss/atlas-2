@@ -229,7 +229,11 @@ header {
     [style*="grid-template-columns:1fr 1fr"],
     [style*="grid-template-columns: 1fr 1fr"],
     [style*="grid-template-columns:1fr 1fr 1fr"],
-    [style*="grid-template-columns: 1fr 1fr 1fr"] {
+    [style*="grid-template-columns: 1fr 1fr 1fr"],
+    [style*="grid-template-columns:repeat(5"],
+    [style*="grid-template-columns: repeat(5"],
+    [style*="grid-template-columns:2fr 1fr 1fr 1fr"],
+    [style*="grid-template-columns: 2fr 1fr 1fr 1fr"] {
         grid-template-columns: 1fr !important;
     }
 }

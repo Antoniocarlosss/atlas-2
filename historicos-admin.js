@@ -114,6 +114,7 @@ function atlasRenderGerirInjecao(ano, mes, index, modulo, rel) {
                         <div style="color:white; font-weight:bold;">${atlasHtml(item.nome)} ${atlasHtml(item.esp)}mm</div>
                         <div style="color:#94a3b8; font-size:12px; margin-top:4px;">
                             ${atlasHtml(item.metros)} m | Vel: ${atlasHtml(item.vel)}<br>
+                            ${item.espuma ? `Espuma: ${atlasHtml(item.espuma)}<br>` : ''}
                             POL ${atlasHtml(item.pol)} | MDI ${atlasHtml(item.mdi)} | PEN ${atlasHtml(item.pen)}
                         </div>
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
@@ -147,6 +148,11 @@ function atlasFormItemInjecao(item, titulo, salvarJS, voltarJS) {
                 <select id="inj-edit-esp" style="width:100%; margin:6px 0 12px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
                     ${esp.map(v => `<option value="${v}" ${String(item?.esp) === String(v) ? 'selected' : ''}>${v} mm</option>`).join('')}
                 </select>
+                <label style="color:#94a3b8; font-size:12px;">ESPUMA</label>
+                <select id="inj-edit-espuma" style="width:100%; margin:6px 0 12px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
+                    <option value="">Opcional</option>
+                    ${(window.OPCOES_ESPUMA_INJECAO || ["30 mm","35 mm","40 mm","50 mm","65 mm ADH"]).map(v => `<option value="${v}" ${String(item?.espuma || '') === String(v) ? 'selected' : ''}>${v}</option>`).join('')}
+                </select>
                 <label style="color:#94a3b8; font-size:12px;">METROS</label>
                 <input id="inj-edit-metros" type="number" step="0.01" value="${atlasHtml(item?.metros || '')}" style="width:100%; margin:6px 0 12px; padding:12px; background:#1e293b; color:white; border:1px solid #334155; border-radius:8px;">
                 <label style="color:#94a3b8; font-size:12px;">VELOCIDADE</label>
@@ -174,6 +180,7 @@ function atlasColetarItemInjecao() {
         id: Date.now(),
         nome: document.getElementById('inj-edit-nome').value,
         esp: document.getElementById('inj-edit-esp').value,
+        espuma: document.getElementById('inj-edit-espuma')?.value || '',
         metros,
         vel: document.getElementById('inj-edit-vel').value,
         pol: document.getElementById('inj-edit-pol').value || 0,
@@ -272,7 +279,7 @@ exibirHistoricoModulo = function(modulo) {
                             </div>
                         </div>
                         <div id="${relId}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #334155; font-size:12px; color:#cbd5e1;">
-                            ${(rel.itens || []).map(item => `<div style="margin-bottom:8px;"><b style="color:#10b981;">${atlasHtml(item.nome)} (${atlasHtml(item.esp)}mm)</b>: ${atlasHtml(item.metros)}m | Vel: ${atlasHtml(item.vel)}</div>`).join('')}
+                            ${(rel.itens || []).map(item => `<div style="margin-bottom:8px;"><b style="color:#10b981;">${atlasHtml(item.nome)} (${atlasHtml(item.esp)}mm)</b>: ${atlasHtml(item.metros)}m | Vel: ${atlasHtml(item.vel)} ${item.espuma ? '| Espuma: ' + atlasHtml(item.espuma) : ''}</div>`).join('')}
                         </div>
                     </div>
                 `;

@@ -10,6 +10,7 @@ const MODULOS_SISTEMA = [
     { chave: 'serra', nome: 'Serra' },
     { chave: 'embalagem', nome: 'Embalagem' },
     { chave: 'plano', nome: 'Plano' },
+    { chave: 'stock', nome: 'Stock' },
     { chave: 'gestao', nome: 'Gestão' },
     { chave: 'config', nome: 'Ajustes' },
     { chave: 'lixeira', nome: 'Lixeira' }
@@ -22,8 +23,12 @@ function obterChavePreferenciasUsuario(idUsuario) {
 function obterPreferenciasPadraoUsuario() {
     return {
         tema: 'escuro',
-        modulosVisiveis: ['injecao', 'bobines', 'serra', 'embalagem', 'plano', 'config', 'lixeira']
+        modulosVisiveis: ['injecao', 'bobines', 'serra', 'embalagem', 'plano', 'stock', 'config', 'lixeira']
     };
+}
+
+function usuarioEhAdminSupervisor() {
+    return usuarioLogado && (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor');
 }
 
 function obterPreferenciasUsuario(idUsuario) {
@@ -74,15 +79,9 @@ function aplicarPreferenciasVisuaisUsuario() {
             return;
         }
 
-        if (nomeModulo === 'lixeira') {
-            card.style.display = '';
-            return;
-        }
-
-        if (nomeModulo === 'gestao') {
-            const podeVerGestao = usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor';
-            const estaSelecionado = preferencias.modulosVisiveis.includes('gestao');
-            card.style.display = podeVerGestao && estaSelecionado ? '' : 'none';
+        if (['gestao', 'conferencia', 'lixeira', 'pesquisa_encomenda'].includes(nomeModulo)) {
+            const podeVerRestrito = usuarioEhAdminSupervisor();
+            card.style.display = podeVerRestrito ? '' : 'none';
             return;
         }
 
@@ -144,8 +143,8 @@ function fecharModal() {
 
 
 function abrirModulo(nome) {
-    if (nome === 'gestao' && (!usuarioLogado || (usuarioLogado.cargo !== 'admin' && usuarioLogado.cargo !== 'supervisor'))) {
-        alert("Apenas ADMIN ou SUPERVISOR podem acessar a Gestão.");
+    if (['gestao', 'conferencia', 'lixeira', 'pesquisa_encomenda'].includes(nome) && !usuarioEhAdminSupervisor()) {
+        alert("Apenas ADMIN ou SUPERVISOR podem acessar esta área.");
         return;
     }
 
@@ -158,6 +157,7 @@ function abrirModulo(nome) {
         serra: "SERRA",
         embalagem: "EMBALAGEM",
         plano: "PLANO",
+        stock: "STOCK",
         gestao: "GESTÃO",
         config: "AJUSTES"
     };
@@ -184,6 +184,9 @@ function abrirModulo(nome) {
     else if (nome === 'plano') {
         renderizarMenuPlanoNovo();
     }
+    else if (nome === 'stock') {
+        renderizarMenuStockAtlas();
+    }
     else if (nome === 'gestao') {
         renderizarMenuGestao();
     }
@@ -206,7 +209,7 @@ let producoesDoDia = []; // Deve ficar no topo do script
             <input type="date" id="data-producao" value="${hoje}" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
             
             <label style="font-size:12px; color:#94a3b8;">TIPO DE PAINEL</label>
-            <select id="inj-painel" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
+            <select id="inj-painel" onchange="atualizarEspumaInjecaoPadrao()" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
                 ${opcoesTipoPainelHTML()}
             </select>
             
@@ -228,6 +231,11 @@ let producoesDoDia = []; // Deve ficar no topo do script
                     <input type="number" id="prod-metros" placeholder="Qtd" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px;">
                 </div>
             </div>
+
+            <label style="font-size:12px; color:#94a3b8;">ESPESSURA DA ESPUMA (OPCIONAL)</label>
+            <select id="inj-espuma" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
+                ${opcoesEspumaInjecaoHTML()}
+            </select>
 
             <label style="font-size:11px; color:#3b82f6; font-weight:bold;">PARÂMETROS DA MÁQUINA</label>
             <div class="grid-quimicos">
@@ -254,11 +262,19 @@ let producoesDoDia = []; // Deve ficar no topo do script
             <div id="lista-temp" style="margin-top:15px;"></div>
             <button id="btn-finalizar" onclick="finalizarTurno('${modulo}')" class="btn-primary btn-finish-dia" style="display:none;">SALVAR RELATÓRIO DO DIA</button>
         </div>`;
+    atualizarEspumaInjecaoPadrao();
+}
+
+function atualizarEspumaInjecaoPadrao() {
+    const painel = document.getElementById('inj-painel')?.value || '';
+    const espuma = document.getElementById('inj-espuma');
+    if (espuma && !espuma.value) espuma.value = espumaPadraoInjecao(painel);
 }
 
 function salvarNaLista() {
     const painel = document.getElementById('inj-painel').value;
     const esp = document.getElementById('inj-esp').value;
+    const espuma = document.getElementById('inj-espuma')?.value || espumaPadraoInjecao(painel);
     const metros = document.getElementById('prod-metros').value;
 
     if(!metros) return alert("Por favor, insira a quantidade de metros!");
@@ -267,6 +283,7 @@ function salvarNaLista() {
         id: Date.now(),
         nome: painel,
         esp: esp,
+        espuma,
         metros: metros,
         pol: document.getElementById('q-pol').value || 0,
         mdi: document.getElementById('q-mdi').value || 0,
@@ -293,7 +310,7 @@ function atualizarListaVisual() {
         
             <div style="padding:10px; border-bottom:1px solid #334155; background:#1e293b; margin-bottom:5px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
                 <div style="font-size:12px; color:white;">
-                    <b>${item.nome} (${item.esp}mm)</b><br>
+                    <b>${item.nome} (${item.esp}mm)</b>${item.espuma ? ` <small style="color:#fbbf24;">| Espuma: ${item.espuma}</small>` : ''}<br>
                     <span>Mts: ${item.metros} | Vel: ${item.vel}</span>
                 </div>
                 <div style="display:flex; gap:5px;">
@@ -336,8 +353,13 @@ function editarTudo(id) {
             </div>
 
             <label style="font-size:12px; color:#94a3b8;">TIPO DE PAINEL</label>
-            <select id="inj-painel" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
-                ${opcoesTipoPainelHTML()}
+            <select id="inj-painel-edit" onchange="if(!document.getElementById('inj-espuma-edit').value) document.getElementById('inj-espuma-edit').value = espumaPadraoInjecao(this.value)" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
+                ${opcoesTipoPainelHTML(item.nome)}
+            </select>
+
+            <label style="font-size:12px; color:#94a3b8;">ESPESSURA DA ESPUMA (OPCIONAL)</label>
+            <select id="inj-espuma-edit" style="width:100%; padding:12px; background:#020617; color:white; border:1px solid #334155; border-radius:8px; margin-bottom:15px;">
+                ${opcoesEspumaInjecaoHTML(item.espuma || espumaPadraoInjecao(item.nome))}
             </select>
 
              <label style="font-size:12px; color:#94a3b8; font-weight:bold;">Velocidade Da Linha</label>
@@ -403,6 +425,8 @@ function salvarEdicaoModal() {
     
     if (item) {
         item.metros = document.getElementById('edit-metros').value;
+        item.nome = document.getElementById('inj-painel-edit')?.value || item.nome;
+        item.espuma = document.getElementById('inj-espuma-edit')?.value || '';
         const motivos = document.querySelectorAll('.paragem-motivo');
         const tempos = document.querySelectorAll('.paragem-tempo');
         item.paragens = [];
@@ -506,7 +530,7 @@ function exibirHistoricoModulo(modulo) {
                             <div id="${relId}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid #334155; font-size:12px; color:#cbd5e1;">
                                 ${rel.itens.map(item => `
                                     <div style="margin-bottom:8px;">
-                                        <b style="color:#10b981;">${item.nome} (${item.esp}mm)</b>: ${item.metros}m | Vel: ${item.vel}m/min
+                                        <b style="color:#10b981;">${item.nome} (${item.esp}mm)</b>: ${item.metros}m | Vel: ${item.vel}m/min ${item.espuma ? '| Espuma: ' + item.espuma : ''}
                                         <div style="font-size:10px; color:#94a3b8;">P:${item.pol} M:${item.mdi} Pen:${item.pen} | C1:${item.cat1} C2:${item.cat2}</div>
                                     </div>
                                 `).join('')}
@@ -545,6 +569,7 @@ function gerarPDF_Injecao_Final(dadosEncoded) {
             <tr>
                 <td style="border: 1px solid #000; padding: 8px; font-size: 14px;">${item.nome}</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align:center; font-size: 14px;">${item.esp}mm</td>
+                <td style="border: 1px solid #000; padding: 8px; text-align:center; font-size: 14px;">${item.espuma || '-'}</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align:center; font-size: 14px; font-weight:bold;">${metrosNum.toFixed(2)}m</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align:center; font-size: 14px;">${item.vel}</td>
                 <td style="border: 1px solid #000; padding: 8px; text-align:center; font-size: 14px;">${item.pol}</td>
@@ -648,7 +673,7 @@ function gerarPDF_Injecao_Final(dadosEncoded) {
                     <table>
                         <thead>
                             <tr>
-                                <th>PRODUTO</th><th>ESP.</th><th>METROS</th><th>VEL.</th><th>POL</th><th>MDI</th><th>PEN</th><th>C1</th><th>C2</th><th>C3</th><th>C4</th>
+                                <th>PRODUTO</th><th>ESP.</th><th>ESPUMA</th><th>METROS</th><th>VEL.</th><th>POL</th><th>MDI</th><th>PEN</th><th>C1</th><th>C2</th><th>C3</th><th>C4</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -928,6 +953,66 @@ function encerrarProducao() {
 }
 
 // --- FUNÇÃO PARA SALVAR E GERAR PDF ---
+function normalizarStockAtlas(valor) {
+    return String(valor || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function filmeStockCombinaLancamento(itemStock, itemLancamento) {
+    const tipoStock = normalizarStockAtlas(`${itemStock.tipo || ''} ${itemStock.medida || ''}`);
+    const subtipo = normalizarStockAtlas(itemLancamento.subtipo);
+    if (!tipoStock || !subtipo) return false;
+
+    if (subtipo.includes('telha canudo')) return tipoStock.includes('telha canudo');
+    if (subtipo.includes('5 ondas')) return tipoStock.includes('5 ondas') || tipoStock.includes('1265');
+    if (subtipo.includes('1060')) return tipoStock.includes('1060') || tipoStock.includes('fachada') || tipoStock.includes('chapa superior');
+    if (subtipo.includes('1065')) return tipoStock.includes('1065') || tipoStock.includes('fachada') || tipoStock.includes('chapa superior');
+    if (subtipo.includes('fachada')) return tipoStock.includes('fachada');
+    return tipoStock.includes(subtipo);
+}
+
+function baixarStockPorLancamentosBobines(itens) {
+    if (!Array.isArray(itens) || !itens.length) return;
+    atlasStockBobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
+    atlasStockFilmes = JSON.parse(localStorage.getItem('atlas_stock_filmes')) || [];
+
+    let alterou = false;
+    const agora = new Date().toLocaleString('pt-BR');
+    const usuario = atlasUsuarioAtualNome();
+
+    itens.forEach(item => {
+        if (item.tipo === 'chapa') {
+            const numero = normalizarStockAtlas(item.numBobine);
+            const ral = normalizarStockAtlas(item.ral);
+            const bobina = atlasStockBobinas.find(b => b.status !== 'fechada' && normalizarStockAtlas(b.numero) === numero)
+                || atlasStockBobinas.find(b => b.status !== 'fechada' && normalizarStockAtlas(b.ral) === ral);
+            if (!bobina) return;
+
+            bobina.qtd = Math.max(0, Number(bobina.qtd || 0) - 1);
+            if (bobina.qtd === 0 || item.status === 'SIM') bobina.status = 'fechada';
+            bobina.ultimaBaixaPor = usuario;
+            bobina.ultimaBaixaEm = agora;
+            alterou = true;
+            return;
+        }
+
+        if (item.tipo === 'filme') {
+            const filme = atlasStockFilmes.find(f => filmeStockCombinaLancamento(f, item));
+            if (!filme) return;
+
+            filme.qtd = Math.max(0, Number(filme.qtd || 0) - Number(item.qtd || 1));
+            filme.ultimaBaixaPor = usuario;
+            filme.ultimaBaixaEm = agora;
+            alterou = true;
+        }
+    });
+
+    if (alterou) salvarStockAtlas();
+}
+
 function fecharDia() {
     const pendente = lancamentosTemporarios.find(i => i.tipo === 'chapa' && i.status === 'ANDAMENTO');
     if(pendente) { alert("Erro: Existe uma bobina em ANDAMENTO."); return; }
@@ -958,6 +1043,7 @@ function fecharDia() {
     };
 
     // Salva no histórico
+    baixarStockPorLancamentosBobines(relFinal.itens);
     historicoBobines.unshift(relFinal);
     localStorage.setItem('historicoBobines', JSON.stringify(historicoBobines));
 
@@ -2467,14 +2553,7 @@ function listarUsuariosSistema() {
                         `}
                     </div>
 
-                    <div id="senha-usuario-${index}" style="display:none; color:#f8fafc; background:#0f172a; padding:10px; border-radius:6px; border:1px solid #334155;">
-                        Senha: ${u.senha}
-                    </div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px;">
-    <button onclick="verSenhaUsuario(${index})" style="background:#3b82f6; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">
-        VER SENHA
-    </button>
-
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
     <button onclick="alternarBloqueioUsuario(${index})" style="background:${u.bloqueado ? '#10b981' : '#f59e0b'}; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold;">
         ${u.bloqueado ? 'DESBLOQUEAR' : 'BLOQUEAR'}
     </button>
@@ -2502,21 +2581,6 @@ function alterarCargoUsuario(index, novoCargo) {
     localStorage.setItem('atlas_usuarios', JSON.stringify(usuariosSistema));
     alert("Cargo atualizado com sucesso.");
     listarUsuariosSistema();
-}
-
-function verSenhaUsuario(index) {
-    const senhaConfirmacao = prompt("Digite sua senha para ver a senha deste usuário:");
-    if (!senhaConfirmacao || !usuarioLogado) return;
-
-    if (senhaConfirmacao !== usuarioLogado.senha) {
-        alert("Senha incorreta.");
-        return;
-    }
-
-    const blocoSenha = document.getElementById(`senha-usuario-${index}`);
-    if (blocoSenha) {
-        blocoSenha.style.display = blocoSenha.style.display === 'none' ? 'block' : 'none';
-    }
 }
 function aplicarPermissoesUsuario() {
     const cardGestao = document.getElementById('card-gestao');
@@ -2586,15 +2650,27 @@ var OPCOES_ESPESSURA_PLANO = [30, 40, 50, 60, 80, 100, 120];
 var OPCOES_RAL_SUP = atlasListaConfig('atlas_config_ral_superior', ["9010", "9006", "7016"]);
 var OPCOES_RAL_INF = atlasListaConfig('atlas_config_ral_inferior', ["3009", "9010", "6009", "9006", "9005", "8004 T", "8004 L", "7016"]);
 var OPCOES_ESP_CHAPA = atlasListaConfig('atlas_config_esp_chapa', ["0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"]);
+var OPCOES_ESPUMA_INJECAO = atlasListaConfig('atlas_config_espuma_injecao', ["30 mm", "35 mm", "40 mm", "50 mm", "65 mm ADH"]);
 window.OPCOES_TIPO_PLANO = OPCOES_TIPO_PLANO;
 window.OPCOES_RAL_SUP = OPCOES_RAL_SUP;
 window.OPCOES_RAL_INF = OPCOES_RAL_INF;
 window.OPCOES_ESP_CHAPA = OPCOES_ESP_CHAPA;
+window.OPCOES_ESPUMA_INJECAO = OPCOES_ESPUMA_INJECAO;
 var OPCOES_QUALIDADE = ["P1", "P2", "Descarte"];
 var MESES_PT = ["", "JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
 
 function opcoesTipoPainelHTML(selecionado = '') {
     return (OPCOES_TIPO_PLANO || []).map(v => `<option value="${v}" ${String(selecionado) === String(v) ? 'selected' : ''}>${v}</option>`).join('');
+}
+
+function opcoesEspumaInjecaoHTML(selecionado = '') {
+    return [`<option value="">Espuma opcional</option>`]
+        .concat((OPCOES_ESPUMA_INJECAO || []).map(v => `<option value="${v}" ${String(selecionado) === String(v) ? 'selected' : ''}>${v}</option>`))
+        .join('');
+}
+
+function espumaPadraoInjecao(tipoPainel) {
+    return String(tipoPainel || '').toLowerCase().includes('telha canudo') ? '65 mm ADH' : '';
 }
 
 function usuarioPodeCriarPlano() {
@@ -3583,11 +3659,11 @@ function renderizarMenuAjustes() {
                 <small style="color:#94a3b8;">Exportar e importar dados</small>
             </div>
 
-            <div class="card" onclick="abrirAjustesSistema()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; grid-column:1 / -1;">
+            ${usuarioEhAdminSupervisor() ? `<div class="card" onclick="abrirAjustesSistema()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155; grid-column:1 / -1;">
                 <i class="fas fa-sliders-h" style="color:#f59e0b; font-size:2.5rem; margin-bottom:15px;"></i>
                 <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Sistema</span>
                 <small style="color:#94a3b8;">Ferramentas e ajustes gerais</small>
-            </div>
+            </div>` : ''}
         </div>
 
         <div id="conteudo-ajustes" style="display:none; padding:15px;"></div>
@@ -3718,6 +3794,7 @@ function abrirAjustesBackup() {
 }
 
 function abrirAjustesSistema() {
+    if (!usuarioEhAdminSupervisor()) return alert('Apenas ADMIN ou SUPERVISOR podem acessar os ajustes do sistema.');
     if (!alternarAbaAjustes(true)) return;
 
     const c = document.getElementById('conteudo-ajustes');
@@ -3739,6 +3816,7 @@ function abrirAjustesSistema() {
             ${htmlEditorListaSistema('RAL inferior', 'atlas_config_ral_inferior', OPCOES_RAL_INF, 'OPCOES_RAL_INF')}
             ${htmlEditorListaSistema('RAL superior', 'atlas_config_ral_superior', OPCOES_RAL_SUP, 'OPCOES_RAL_SUP')}
             ${htmlEditorListaSistema('Espessura de chapa opcional', 'atlas_config_esp_chapa', OPCOES_ESP_CHAPA, 'OPCOES_ESP_CHAPA')}
+            ${htmlEditorListaSistema('Espessura da espuma - Injeção', 'atlas_config_espuma_injecao', OPCOES_ESPUMA_INJECAO, 'OPCOES_ESPUMA_INJECAO')}
         </div>
     `;
 }
@@ -3782,6 +3860,10 @@ function atualizarVariavelListaSistema(variavel, lista) {
         OPCOES_ESP_CHAPA = lista;
         window.OPCOES_ESP_CHAPA = lista;
     }
+    if (variavel === 'OPCOES_ESPUMA_INJECAO') {
+        OPCOES_ESPUMA_INJECAO = lista;
+        window.OPCOES_ESPUMA_INJECAO = lista;
+    }
 }
 
 function obterVariavelListaSistema(variavel) {
@@ -3790,6 +3872,7 @@ function obterVariavelListaSistema(variavel) {
     if (variavel === 'OPCOES_RAL_INF') return OPCOES_RAL_INF;
     if (variavel === 'OPCOES_RAL_SUP') return OPCOES_RAL_SUP;
     if (variavel === 'OPCOES_ESP_CHAPA') return OPCOES_ESP_CHAPA;
+    if (variavel === 'OPCOES_ESPUMA_INJECAO') return OPCOES_ESPUMA_INJECAO;
     return [];
 }
 
@@ -5960,6 +6043,189 @@ function atlasInstalarLixeira() {
 window.addEventListener('load', () => {
     setTimeout(atlasInstalarLixeira, 300);
 });
+
+/* ==========================================================
+   MÓDULO STOCK - BOBINAS E FILMES
+   ========================================================== */
+
+let atlasStockBobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
+let atlasStockFilmes = JSON.parse(localStorage.getItem('atlas_stock_filmes')) || [];
+
+function salvarStockAtlas() {
+    localStorage.setItem('atlas_stock_bobinas', JSON.stringify(atlasStockBobinas));
+    localStorage.setItem('atlas_stock_filmes', JSON.stringify(atlasStockFilmes));
+}
+
+function renderizarMenuStockAtlas() {
+    const render = document.getElementById('render-modulo');
+    if (!render) return;
+
+    render.innerHTML = `
+        <div style="padding:15px; color:white;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                <div class="card" onclick="renderizarStockBobinasAtlas()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                    <i class="fas fa-compact-disc" style="color:#3b82f6; font-size:2.5rem; margin-bottom:15px;"></i>
+                    <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Bobinas</span>
+                    <small style="color:#94a3b8;">Cadastro e baixas</small>
+                </div>
+                <div class="card" onclick="renderizarStockFilmesAtlas()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border:1px solid #334155;">
+                    <i class="fas fa-film" style="color:#10b981; font-size:2.5rem; margin-bottom:15px;"></i>
+                    <span style="display:block; color:white; font-weight:bold; font-size:13px; text-transform:uppercase;">Filmes</span>
+                    <small style="color:#94a3b8;">Medidas e quantidades</small>
+                </div>
+            </div>
+            <div id="stock-conteudo" style="margin-top:15px;"></div>
+        </div>
+    `;
+}
+
+function corQtdStock(qtd) {
+    return Number(qtd || 0) < 10 ? '#ef4444' : '#10b981';
+}
+
+function grupoFornecedorStock(lista) {
+    return (lista || []).reduce((acc, item) => {
+        const fornecedor = item.fornecedor || 'SEM FORNECEDOR';
+        acc[fornecedor] ||= [];
+        acc[fornecedor].push(item);
+        return acc;
+    }, {});
+}
+
+function renderizarStockBobinasAtlas() {
+    atlasStockBobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
+    const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
+    if (!c) return;
+
+    const grupos = grupoFornecedorStock(atlasStockBobinas);
+    const ativas = atlasStockBobinas.filter(b => b.status !== 'fechada');
+    const fechadas = atlasStockBobinas.filter(b => b.status === 'fechada');
+
+    c.innerHTML = `
+        <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
+            <h3 style="margin-top:0;">Bobinas</h3>
+            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; margin-bottom:12px;">
+                <input id="stock-bob-num" placeholder="Nº bobina" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <select id="stock-bob-ral" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${OPCOES_RAL_INF.concat(OPCOES_RAL_SUP).filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
+                <input id="stock-bob-esp" placeholder="Espessura" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <input id="stock-bob-forn" placeholder="Fornecedor" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <input id="stock-bob-qtd" type="number" value="1" min="1" placeholder="Qtd" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+            </div>
+            <button onclick="cadastrarBobinaStockAtlas()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">CADASTRAR BOBINA</button>
+        </div>
+
+        <h3 style="margin:18px 0 8px;">Em andamento</h3>
+        ${renderizarListaBobinasStock(ativas, false)}
+        <h3 style="margin:18px 0 8px;">Fechadas</h3>
+        ${renderizarListaBobinasStock(fechadas, true)}
+    `;
+}
+
+function renderizarListaBobinasStock(lista, fechadas) {
+    if (!lista.length) return `<div style="color:#94a3b8; padding:12px;">Nenhuma bobina ${fechadas ? 'fechada' : 'em andamento'}.</div>`;
+    const grupos = grupoFornecedorStock(lista);
+    return Object.keys(grupos).sort().map(forn => `
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; margin-bottom:10px; overflow:hidden;">
+            <div style="padding:10px; font-weight:bold; color:white; background:#0f172a;">${textoSeguroConferencia(forn)}</div>
+            ${grupos[forn].map(item => `
+                <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px; border-top:1px solid #334155; flex-wrap:wrap;">
+                    <span><b>Bobina ${textoSeguroConferencia(item.numero)}</b><br><small style="color:#94a3b8;">RAL ${textoSeguroConferencia(item.ral)} | Esp. ${textoSeguroConferencia(item.espessura || '-')}</small></span>
+                    <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
+                    <div style="display:flex; gap:8px;">
+                        ${item.status !== 'fechada' ? `<button onclick="baixarBobinaStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button><button onclick="fecharBobinaStockAtlas('${item.id}')" style="background:#64748b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">FECHAR</button>` : ''}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `).join('');
+}
+
+function cadastrarBobinaStockAtlas() {
+    const numero = document.getElementById('stock-bob-num')?.value.trim();
+    const ral = document.getElementById('stock-bob-ral')?.value;
+    const espessura = document.getElementById('stock-bob-esp')?.value.trim();
+    const fornecedor = document.getElementById('stock-bob-forn')?.value.trim();
+    const qtd = Number(document.getElementById('stock-bob-qtd')?.value || 1);
+    if (!numero || !ral || !fornecedor) return alert('Informe número, RAL e fornecedor.');
+    atlasStockBobinas.unshift({ id: String(Date.now()), numero, ral, espessura, fornecedor, qtd, status: 'andamento', criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
+    salvarStockAtlas();
+    renderizarStockBobinasAtlas();
+}
+
+function baixarBobinaStockAtlas(id) {
+    const item = atlasStockBobinas.find(b => String(b.id) === String(id));
+    if (!item) return;
+    item.qtd = Math.max(0, Number(item.qtd || 0) - 1);
+    if (item.qtd === 0) item.status = 'fechada';
+    item.ultimaBaixaPor = atlasUsuarioAtualNome();
+    item.ultimaBaixaEm = new Date().toLocaleString('pt-BR');
+    salvarStockAtlas();
+    renderizarStockBobinasAtlas();
+}
+
+function fecharBobinaStockAtlas(id) {
+    const item = atlasStockBobinas.find(b => String(b.id) === String(id));
+    if (!item) return;
+    item.status = 'fechada';
+    salvarStockAtlas();
+    renderizarStockBobinasAtlas();
+}
+
+function renderizarStockFilmesAtlas() {
+    atlasStockFilmes = JSON.parse(localStorage.getItem('atlas_stock_filmes')) || [];
+    const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
+    if (!c) return;
+    const tipos = ['5 Ondas - 1265', 'Fachada/Chapa superior - 1060', 'Fachada/Chapa superior - 1065', 'Filme Telha Canudo'];
+    const grupos = grupoFornecedorStock(atlasStockFilmes);
+
+    c.innerHTML = `
+        <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
+            <h3 style="margin-top:0;">Filmes</h3>
+            <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
+                <select id="stock-film-tipo" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${tipos.map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
+                <input id="stock-film-medida" placeholder="Medida" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <input id="stock-film-forn" placeholder="Fornecedor" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <input id="stock-film-qtd" type="number" value="1" min="1" placeholder="Qtd" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+            </div>
+            <button onclick="cadastrarFilmeStockAtlas()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">CADASTRAR FILME</button>
+        </div>
+
+        <h3 style="margin:18px 0 8px;">Stock de filmes</h3>
+        ${Object.keys(grupos).length ? Object.keys(grupos).sort().map(forn => `
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; margin-bottom:10px; overflow:hidden;">
+                <div style="padding:10px; font-weight:bold; color:white; background:#0f172a;">${textoSeguroConferencia(forn)}</div>
+                ${grupos[forn].map(item => `
+                    <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px; border-top:1px solid #334155; flex-wrap:wrap;">
+                        <span><b>${textoSeguroConferencia(item.tipo)}</b><br><small style="color:#94a3b8;">Medida: ${textoSeguroConferencia(item.medida || '-')}</small></span>
+                        <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
+                        <button onclick="baixarFilmeStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button>
+                    </div>
+                `).join('')}
+            </div>
+        `).join('') : `<div style="color:#94a3b8; padding:12px;">Nenhum filme cadastrado.</div>`}
+    `;
+}
+
+function cadastrarFilmeStockAtlas() {
+    const tipo = document.getElementById('stock-film-tipo')?.value;
+    const medida = document.getElementById('stock-film-medida')?.value.trim();
+    const fornecedor = document.getElementById('stock-film-forn')?.value.trim();
+    const qtd = Number(document.getElementById('stock-film-qtd')?.value || 1);
+    if (!tipo || !fornecedor) return alert('Informe tipo e fornecedor.');
+    atlasStockFilmes.unshift({ id: String(Date.now()), tipo, medida, fornecedor, qtd, criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
+    salvarStockAtlas();
+    renderizarStockFilmesAtlas();
+}
+
+function baixarFilmeStockAtlas(id) {
+    const item = atlasStockFilmes.find(f => String(f.id) === String(id));
+    if (!item) return;
+    item.qtd = Math.max(0, Number(item.qtd || 0) - 1);
+    item.ultimaBaixaPor = atlasUsuarioAtualNome();
+    item.ultimaBaixaEm = new Date().toLocaleString('pt-BR');
+    salvarStockAtlas();
+    renderizarStockFilmesAtlas();
+}
 /* ==========================================================
    PLANO - MARCAR ENCOMENDA / PEDIDO COMO CANCELADO
    Cole no FINAL do script.js
@@ -6212,12 +6478,13 @@ window.addEventListener('load', () => {
         atlasGarantirCardPesquisaEncomenda();
 
         const card = document.getElementById('card-pesquisa-encomenda');
-        if (card) card.style.display = '';
+        if (card) card.style.display = usuarioEhAdminSupervisor() ? '' : 'none';
     };
 
     const abrirModuloOriginalPesquisa = window.abrirModulo;
     window.abrirModulo = function(nome) {
         if (nome === 'pesquisa_encomenda') {
+            if (!usuarioEhAdminSupervisor()) return alert('Apenas ADMIN ou SUPERVISOR podem pesquisar encomendas.');
             document.getElementById('grid-home').style.display = 'none';
             document.getElementById('conteudo-modulo').style.display = 'block';
             document.getElementById('titulo-modulo').innerText = 'PESQUISAR ENCOMENDA';
