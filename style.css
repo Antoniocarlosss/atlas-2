@@ -264,6 +264,35 @@ body.tema-claro span {
     color: inherit;
 }
 
+body.tema-claro #conteudo-ajustes [style*="background:#1e293b"],
+body.tema-claro #conteudo-ajustes [style*="background: #1e293b"],
+body.tema-claro #conteudo-ajustes [style*="background:#111827"],
+body.tema-claro #conteudo-ajustes [style*="background: #111827"],
+body.tema-claro #conteudo-ajustes [style*="background:#0f172a"],
+body.tema-claro #conteudo-ajustes [style*="background: #0f172a"] {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+body.tema-claro #conteudo-ajustes label,
+body.tema-claro #conteudo-ajustes span,
+body.tema-claro #conteudo-ajustes small,
+body.tema-claro #conteudo-ajustes h2,
+body.tema-claro #conteudo-ajustes h3,
+body.tema-claro #conteudo-ajustes p,
+body.tema-claro #conteudo-ajustes div {
+    color: #0f172a !important;
+}
+
+body.tema-claro #conteudo-ajustes input,
+body.tema-claro #conteudo-ajustes select,
+body.tema-claro #conteudo-ajustes textarea {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #94a3b8 !important;
+}
+
 body.tema-claro header {
     background: #ffffff;
 }

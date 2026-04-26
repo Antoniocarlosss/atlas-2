@@ -34,6 +34,11 @@
         return !!normalizarTipoPainelAtlas(tipo);
     }
 
+    function painelTemAcabamentoAtlas(tipo) {
+        const normalizado = normalizarTipoPainelAtlas(tipo);
+        return normalizado === "Fachada Oculta" || normalizado === "Fachada Visível";
+    }
+
     function htmlOpcoes(lista, selecionado) {
         return lista.map(v => `<option value="${v}" ${String(selecionado || "") === String(v) ? "selected" : ""}>${v || "Opcional"}</option>`).join("");
     }
@@ -43,7 +48,7 @@
             <div id="${prefixo}-detalhes-painel" style="display:none; background:#111827; border:1px solid #334155; border-radius:10px; padding:12px; margin:10px 0;">
                 <div style="color:#f59e0b; font-size:12px; font-weight:bold; margin-bottom:10px;">DETALHES DA CHAPA</div>
 
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div id="${prefixo}-acabamentos-painel" style="display:none; grid-template-columns:1fr 1fr; gap:10px;">
                     <div>
                         <label style="color:#94a3b8; font-size:11px; font-weight:bold;">ACAB. INFERIOR</label>
                         <select id="${prefixo}-acab-inf" style="width:100%; margin-top:5px; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
@@ -86,9 +91,10 @@
             };
         }
 
+        const temAcabamento = painelTemAcabamentoAtlas(tipo);
         return {
-            acabamentoInferior: document.getElementById(`${prefixo}-acab-inf`)?.value || "Canelada",
-            acabamentoSuperior: document.getElementById(`${prefixo}-acab-sup`)?.value || "Canelada",
+            acabamentoInferior: temAcabamento ? (document.getElementById(`${prefixo}-acab-inf`)?.value || "Canelada") : "",
+            acabamentoSuperior: temAcabamento ? (document.getElementById(`${prefixo}-acab-sup`)?.value || "Canelada") : "",
             espChapaInferior: document.getElementById(`${prefixo}-esp-chapa-inf`)?.value || "",
             espChapaSuperior: document.getElementById(`${prefixo}-esp-chapa-sup`)?.value || ""
         };
@@ -104,24 +110,30 @@
     function atualizarBoxDetalhes(prefixo, tipo) {
         const box = document.getElementById(`${prefixo}-detalhes-painel`);
         if (box) box.style.display = painelTemDetalhesAtlas(tipo) ? "block" : "none";
+        const acabamentos = document.getElementById(`${prefixo}-acabamentos-painel`);
+        if (acabamentos) acabamentos.style.display = painelTemAcabamentoAtlas(tipo) ? "grid" : "none";
     }
 
     function detalhesLinhaPDF(item) {
         if (!painelTemDetalhesAtlas(item.tipo)) return "";
-        const inf = item.acabamentoInferior || "Canelada";
-        const sup = item.acabamentoSuperior || "Canelada";
+        const temAcabamento = painelTemAcabamentoAtlas(item.tipo);
+        const inf = temAcabamento ? (item.acabamentoInferior || "Canelada") : "";
+        const sup = temAcabamento ? (item.acabamentoSuperior || "Canelada") : "";
         const espInf = item.espChapaInferior ? ` | Chapa inf: ${item.espChapaInferior}mm` : "";
         const espSup = item.espChapaSuperior ? ` | Chapa sup: ${item.espChapaSuperior}mm` : "";
-        return `<br><small>INF: ${inf}${espInf}<br>SUP: ${sup}${espSup}</small>`;
+        if (!temAcabamento && !espInf && !espSup) return "";
+        return `<br><small>${temAcabamento ? `INF: ${inf}<br>SUP: ${sup}` : ""}${espInf}${espSup}</small>`;
     }
 
     function detalhesLinhaTela(item) {
         if (!painelTemDetalhesAtlas(item.tipo)) return "";
-        const inf = item.acabamentoInferior || "Canelada";
-        const sup = item.acabamentoSuperior || "Canelada";
+        const temAcabamento = painelTemAcabamentoAtlas(item.tipo);
+        const inf = temAcabamento ? (item.acabamentoInferior || "Canelada") : "";
+        const sup = temAcabamento ? (item.acabamentoSuperior || "Canelada") : "";
         const espInf = item.espChapaInferior ? ` | Chapa inf: ${item.espChapaInferior}mm` : "";
         const espSup = item.espChapaSuperior ? ` | Chapa sup: ${item.espChapaSuperior}mm` : "";
-        return `<br><small style="color:#fbbf24;">INF: ${inf}${espInf} | SUP: ${sup}${espSup}</small>`;
+        if (!temAcabamento && !espInf && !espSup) return "";
+        return `<br><small style="color:#fbbf24;">${temAcabamento ? `INF: ${inf} | SUP: ${sup}` : ""}${espInf}${espSup}</small>`;
     }
 
     function buscarPedidoPlanoAtlas(numero) {
