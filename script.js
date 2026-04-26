@@ -11,7 +11,8 @@ const MODULOS_SISTEMA = [
     { chave: 'embalagem', nome: 'Embalagem' },
     { chave: 'plano', nome: 'Plano' },
     { chave: 'gestao', nome: 'Gestão' },
-    { chave: 'config', nome: 'Ajustes' }
+    { chave: 'config', nome: 'Ajustes' },
+    { chave: 'lixeira', nome: 'Lixeira' }
 ];
 
 function obterChavePreferenciasUsuario(idUsuario) {
@@ -21,7 +22,7 @@ function obterChavePreferenciasUsuario(idUsuario) {
 function obterPreferenciasPadraoUsuario() {
     return {
         tema: 'escuro',
-        modulosVisiveis: ['injecao', 'bobines', 'serra', 'embalagem', 'plano', 'config']
+        modulosVisiveis: ['injecao', 'bobines', 'serra', 'embalagem', 'plano', 'config', 'lixeira']
     };
 }
 
@@ -33,9 +34,12 @@ function obterPreferenciasUsuario(idUsuario) {
         return obterPreferenciasPadraoUsuario();
     }
 
+    const padrao = obterPreferenciasPadraoUsuario();
+    const modulosSalvos = Array.isArray(salvas.modulosVisiveis) ? salvas.modulosVisiveis : padrao.modulosVisiveis;
+
     return {
         tema: salvas.tema || 'escuro',
-        modulosVisiveis: Array.isArray(salvas.modulosVisiveis) ? salvas.modulosVisiveis : obterPreferenciasPadraoUsuario().modulosVisiveis
+        modulosVisiveis: [...new Set([...modulosSalvos, 'lixeira'])]
     };
 }
 
@@ -66,6 +70,11 @@ function aplicarPreferenciasVisuaisUsuario() {
         const nomeModulo = match[1];
 
         if (nomeModulo === 'config') {
+            card.style.display = '';
+            return;
+        }
+
+        if (nomeModulo === 'lixeira') {
             card.style.display = '';
             return;
         }
