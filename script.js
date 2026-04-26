@@ -987,12 +987,19 @@ function baixarStockPorLancamentosBobines(itens) {
         if (item.tipo === 'chapa') {
             const numero = normalizarStockAtlas(item.numBobine);
             const ral = normalizarStockAtlas(item.ral);
-            const bobina = atlasStockBobinas.find(b => b.status !== 'fechada' && normalizarStockAtlas(b.numero) === numero)
-                || atlasStockBobinas.find(b => b.status !== 'fechada' && normalizarStockAtlas(b.ral) === ral);
+            const bobina = atlasStockBobinas.find(b => b.status !== 'acabada_mes' && normalizarStockAtlas(b.numero) === numero)
+                || atlasStockBobinas.find(b => b.status !== 'acabada_mes' && normalizarStockAtlas(b.ral) === ral);
             if (!bobina) return;
 
             bobina.qtd = Math.max(0, Number(bobina.qtd || 0) - 1);
-            bobina.status = item.status === 'SIM' || bobina.qtd === 0 ? 'fechada' : 'andamento';
+            if (item.status === 'SIM' || bobina.qtd === 0) {
+                bobina.status = 'acabada_mes';
+                bobina.acabadaPor = usuario;
+                bobina.acabadaEm = agora;
+                bobina.acabadaMesISO = new Date().toISOString().slice(0, 7);
+            } else {
+                bobina.status = 'andamento';
+            }
             bobina.ultimaBaixaPor = usuario;
             bobina.ultimaBaixaEm = agora;
             alterou = true;
@@ -6129,14 +6136,28 @@ function grupoFornecedorMedidaRalStock(lista) {
     }, {});
 }
 
+function bobinaAcabadaNoMesAtualStock(item) {
+    const mesAtual = new Date().toISOString().slice(0, 7);
+    return item.status === 'acabada_mes' && (!item.acabadaMesISO || item.acabadaMesISO === mesAtual);
+}
+
 function renderizarStockBobinasAtlas() {
     atlasStockBobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
+    let migrouBobinas = false;
+    atlasStockBobinas.forEach(b => {
+        if (b.status === 'andamento' && !b.ultimaBaixaEm) {
+            b.status = 'fechada';
+            migrouBobinas = true;
+        }
+    });
+    if (migrouBobinas) salvarStockAtlas();
     const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
     if (!c) return;
 
     const grupos = grupoFornecedorStock(atlasStockBobinas);
-    const ativas = atlasStockBobinas.filter(b => b.status !== 'fechada');
-    const fechadas = atlasStockBobinas.filter(b => b.status === 'fechada');
+    const ativas = atlasStockBobinas.filter(b => b.status === 'andamento');
+    const fechadas = atlasStockBobinas.filter(b => !b.status || b.status === 'fechada');
+    const acabadasMes = atlasStockBobinas.filter(bobinaAcabadaNoMesAtualStock);
 
     c.innerHTML = `
         <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
@@ -6155,14 +6176,16 @@ function renderizarStockBobinasAtlas() {
         </div>
 
         <h3 style="margin:18px 0 8px;">Em andamento</h3>
-        ${renderizarListaBobinasStock(ativas, false)}
+        ${renderizarListaBobinasStock(ativas, 'em andamento')}
         <h3 style="margin:18px 0 8px;">Fechadas</h3>
-        ${renderizarListaBobinasStock(fechadas, true)}
+        ${renderizarListaBobinasStock(fechadas, 'fechada')}
+        <h3 style="margin:18px 0 8px;">Acabadas durante o mes</h3>
+        ${renderizarListaBobinasStock(acabadasMes, 'acabada durante o mes')}
     `;
 }
 
-function renderizarListaBobinasStock(lista, fechadas) {
-    if (!lista.length) return `<div style="color:#94a3b8; padding:12px;">Nenhuma bobina ${fechadas ? 'fechada' : 'em andamento'}.</div>`;
+function renderizarListaBobinasStock(lista, rotuloVazio) {
+    if (!lista.length) return `<div style="color:#94a3b8; padding:12px;">Nenhuma bobina ${rotuloVazio || 'cadastrada'}.</div>`;
     const grupos = grupoFornecedorMedidaRalStock(lista);
     return Object.keys(grupos).sort().map(chave => {
         const grupo = grupos[chave];
@@ -6176,7 +6199,7 @@ function renderizarListaBobinasStock(lista, fechadas) {
                     <span><b>Bobina ${textoSeguroConferencia(item.numero)}</b><br><small style="color:#94a3b8;">Medida ${textoSeguroConferencia(item.medida || '-')} | RAL ${textoSeguroConferencia(item.ral)} | Esp. ${textoSeguroConferencia(item.espessura || '-')}</small></span>
                     <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
                     <div style="display:flex; gap:8px;">
-                        ${item.status !== 'fechada' ? `<button onclick="baixarBobinaStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button><button onclick="fecharBobinaStockAtlas('${item.id}')" style="background:#64748b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">FECHAR</button>` : ''}
+                        ${item.status !== 'acabada_mes' ? `<button onclick="baixarBobinaStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button><button onclick="fecharBobinaStockAtlas('${item.id}')" style="background:#64748b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">ACABOU</button>` : ''}
                     </div>
                 </div>
             `).join('')}
@@ -6193,7 +6216,7 @@ function cadastrarBobinaStockAtlas() {
     const fornecedor = document.getElementById('stock-bob-forn')?.value.trim();
     const qtd = Number(document.getElementById('stock-bob-qtd')?.value || 1);
     if (!numero || !ral || !medida || !fornecedor) return alert('Informe numero, RAL, medida e fornecedor.');
-    atlasStockBobinas.unshift({ id: String(Date.now()), numero, ral, medida, espessura, fornecedor, qtd, status: 'andamento', criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
+    atlasStockBobinas.unshift({ id: String(Date.now()), numero, ral, medida, espessura, fornecedor, qtd, status: 'fechada', criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
     salvarStockAtlas();
     renderizarStockBobinasAtlas();
 }
@@ -6202,9 +6225,14 @@ function baixarBobinaStockAtlas(id) {
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
     item.qtd = Math.max(0, Number(item.qtd || 0) - 1);
-    if (item.qtd === 0) item.status = 'fechada';
+    item.status = item.qtd === 0 ? 'acabada_mes' : 'andamento';
     item.ultimaBaixaPor = atlasUsuarioAtualNome();
     item.ultimaBaixaEm = new Date().toLocaleString('pt-BR');
+    if (item.status === 'acabada_mes') {
+        item.acabadaPor = item.ultimaBaixaPor;
+        item.acabadaEm = item.ultimaBaixaEm;
+        item.acabadaMesISO = new Date().toISOString().slice(0, 7);
+    }
     salvarStockAtlas();
     renderizarStockBobinasAtlas();
 }
@@ -6212,7 +6240,10 @@ function baixarBobinaStockAtlas(id) {
 function fecharBobinaStockAtlas(id) {
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
-    item.status = 'fechada';
+    item.status = 'acabada_mes';
+    item.acabadaPor = atlasUsuarioAtualNome();
+    item.acabadaEm = new Date().toLocaleString('pt-BR');
+    item.acabadaMesISO = new Date().toISOString().slice(0, 7);
     salvarStockAtlas();
     renderizarStockBobinasAtlas();
 }
