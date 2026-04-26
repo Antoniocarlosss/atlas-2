@@ -1956,6 +1956,7 @@ let db_emb_hist = JSON.parse(localStorage.getItem('atlas_emb_hist')) || [];
 
 function renderizarMenuEmbalagem() {
     const render = document.getElementById('render-modulo');
+    db_emb_live = JSON.parse(localStorage.getItem('atlas_emb_live')) || [];
     render.innerHTML = `
         <div id="container-menu-emb" style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; padding:15px;">
             <div class="card" onclick="exibirSetupEmbalagem()" style="cursor:pointer; background:#1e293b; border-radius:10px; padding:30px 15px; text-align:center; border: 1px solid #334155;">
@@ -1969,6 +1970,8 @@ function renderizarMenuEmbalagem() {
         </div>
         <div id="container-acao-emb" style="display:none; padding:15px;"></div>
     `;
+
+    alternarAbaEmbalagem(false);
 }
 
 // --- 2. GERENCIAMENTO DE INTERFACE ---
