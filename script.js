@@ -999,6 +999,7 @@ function baixarStockPorLancamentosBobines(itens) {
                 bobina.acabadaMesISO = new Date().toISOString().slice(0, 7);
             } else {
                 bobina.status = 'andamento';
+                bobina.origemAndamento = 'relatorio_bobines';
             }
             bobina.ultimaBaixaPor = usuario;
             bobina.ultimaBaixaEm = agora;
@@ -6141,11 +6142,46 @@ function bobinaAcabadaNoMesAtualStock(item) {
     return item.status === 'acabada_mes' && (!item.acabadaMesISO || item.acabadaMesISO === mesAtual);
 }
 
+function contarBobinasStock(lista, campo) {
+    return (lista || []).reduce((acc, item) => {
+        const chave = item[campo] || 'SEM INFO';
+        acc[chave] = (acc[chave] || 0) + Number(item.qtd || 0);
+        return acc;
+    }, {});
+}
+
+function htmlResumoBobinasStock(lista) {
+    const blocos = [
+        ['Por fornecedor', contarBobinasStock(lista, 'fornecedor')],
+        ['Por RAL', contarBobinasStock(lista, 'ral')],
+        ['Por espessura', contarBobinasStock(lista, 'espessura')]
+    ];
+
+    return `
+        <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px; margin-top:14px;">
+            <h3 style="margin:0 0 12px;">Resumo do stock de bobinas</h3>
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
+                ${blocos.map(([titulo, dados]) => `
+                    <div style="background:#0f172a; border:1px solid #334155; border-radius:10px; padding:12px;">
+                        <b style="display:block; margin-bottom:8px; color:#93c5fd;">${titulo}</b>
+                        ${Object.keys(dados).sort().map(chave => `
+                            <div style="display:flex; justify-content:space-between; gap:8px; border-top:1px solid #1e293b; padding:7px 0;">
+                                <span>${textoSeguroConferencia(chave)}</span>
+                                <b style="color:${corQtdStock(dados[chave])};">${dados[chave]} un.</b>
+                            </div>
+                        `).join('') || `<small style="color:#94a3b8;">Sem bobinas.</small>`}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
 function renderizarStockBobinasAtlas() {
     atlasStockBobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
     let migrouBobinas = false;
     atlasStockBobinas.forEach(b => {
-        if (b.status === 'andamento' && !b.ultimaBaixaEm) {
+        if (b.status === 'andamento' && b.origemAndamento !== 'relatorio_bobines') {
             b.status = 'fechada';
             migrouBobinas = true;
         }
@@ -6154,10 +6190,10 @@ function renderizarStockBobinasAtlas() {
     const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
     if (!c) return;
 
-    const grupos = grupoFornecedorStock(atlasStockBobinas);
-    const ativas = atlasStockBobinas.filter(b => b.status === 'andamento');
+    const ativas = atlasStockBobinas.filter(b => b.status === 'andamento' && b.origemAndamento === 'relatorio_bobines');
     const fechadas = atlasStockBobinas.filter(b => !b.status || b.status === 'fechada');
     const acabadasMes = atlasStockBobinas.filter(bobinaAcabadaNoMesAtualStock);
+    const disponiveisResumo = atlasStockBobinas.filter(b => b.status !== 'acabada_mes');
 
     c.innerHTML = `
         <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
@@ -6175,6 +6211,7 @@ function renderizarStockBobinasAtlas() {
             <button onclick="cadastrarBobinaStockAtlas()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">CADASTRAR BOBINA</button>
         </div>
 
+        ${htmlResumoBobinasStock(disponiveisResumo)}
         <h3 style="margin:18px 0 8px;">Em andamento</h3>
         ${renderizarListaBobinasStock(ativas, 'em andamento')}
         <h3 style="margin:18px 0 8px;">Fechadas</h3>
@@ -6225,7 +6262,8 @@ function baixarBobinaStockAtlas(id) {
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
     item.qtd = Math.max(0, Number(item.qtd || 0) - 1);
-    item.status = item.qtd === 0 ? 'acabada_mes' : 'andamento';
+    item.status = item.qtd === 0 ? 'acabada_mes' : 'fechada';
+    item.origemAndamento = '';
     item.ultimaBaixaPor = atlasUsuarioAtualNome();
     item.ultimaBaixaEm = new Date().toLocaleString('pt-BR');
     if (item.status === 'acabada_mes') {
