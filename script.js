@@ -6136,7 +6136,9 @@ function renderizarStockBobinasAtlas() {
                 <input id="stock-bob-num" placeholder="Nº bobina" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
                 <select id="stock-bob-ral" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${OPCOES_RAL_INF.concat(OPCOES_RAL_SUP).filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <select id="stock-bob-medida" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_MEDIDAS_CHAPA_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
-                <input id="stock-bob-esp" placeholder="Espessura" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <select id="stock-bob-esp" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                    ${(OPCOES_ESP_CHAPA || []).map(v=>`<option value="${v}">${String(v).replace('.', ',')}</option>`).join('')}
+                </select>
                 <select id="stock-bob-forn" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_FORNECEDORES_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <input id="stock-bob-qtd" type="number" value="1" min="1" placeholder="Qtd" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
             </div>
