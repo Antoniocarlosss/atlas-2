@@ -444,6 +444,7 @@ renderizarHistoricoBobines = function() {
 
 function atlasGetStoreCorte(tipo) {
     if (tipo === 'serra') {
+        db_serra_hist = JSON.parse(localStorage.getItem('atlas_serra_hist')) || [];
         return {
             hist: db_serra_hist,
             key: 'atlas_serra_hist',
@@ -453,6 +454,7 @@ function atlasGetStoreCorte(tipo) {
             titulo: 'Serra'
         };
     }
+    db_emb_hist = JSON.parse(localStorage.getItem('atlas_emb_hist')) || [];
     return {
         hist: db_emb_hist,
         key: 'atlas_emb_hist',

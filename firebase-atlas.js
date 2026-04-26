@@ -268,9 +268,19 @@ function atlasFirebaseAgendarEnvio(chave) {
 }
 
 const atlasLocalStorageSetItemOriginal = localStorage.setItem;
+const atlasLocalStorageRemoveItemOriginal = localStorage.removeItem;
 
 localStorage.setItem = function(chave, valor) {
     const resultado = atlasLocalStorageSetItemOriginal.call(localStorage, chave, valor);
+    if (!atlasFirebaseBloqueado && (chave.startsWith("atlas_") || chave === "historicoBobines")) {
+        atlasFirebaseUltimaAlteracaoLocal = Date.now();
+    }
+    atlasFirebaseAgendarEnvio(chave);
+    return resultado;
+};
+
+localStorage.removeItem = function(chave) {
+    const resultado = atlasLocalStorageRemoveItemOriginal.call(localStorage, chave);
     if (!atlasFirebaseBloqueado && (chave.startsWith("atlas_") || chave === "historicoBobines")) {
         atlasFirebaseUltimaAlteracaoLocal = Date.now();
     }

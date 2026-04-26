@@ -2201,6 +2201,7 @@ function fecharDiaEmbalagem() {
 function listarHistoricoEmbalagem() {
     alternarAbaEmbalagem(true);
     const container = document.getElementById('container-acao-emb');
+    db_emb_hist = JSON.parse(localStorage.getItem('atlas_emb_hist')) || [];
     let agrupado = {};
 
     db_emb_hist.forEach(rel => {
