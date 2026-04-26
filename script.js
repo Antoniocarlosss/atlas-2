@@ -2580,10 +2580,26 @@ var db_plano_live = JSON.parse(localStorage.getItem('atlas_plano_live')) || null
 var db_plano_hist = JSON.parse(localStorage.getItem('atlas_plano_hist')) || [];
 var destinosPlano = JSON.parse(localStorage.getItem('atlas_plano_destinos')) || ["Ansião", "Leiria", "Algarve", "Sobreda", "Abrantes"];
 
-var OPCOES_TIPO_PLANO = ["5 Ondas", "Fachada", "Telha Canudo"];
+function atlasListaConfig(chave, padrao) {
+    try {
+        const lista = JSON.parse(localStorage.getItem(chave));
+        return Array.isArray(lista) && lista.length ? lista : padrao;
+    } catch (erro) {
+        return padrao;
+    }
+}
+
+function atlasSalvarListaConfig(chave, lista) {
+    const limpa = [...new Set((lista || []).map(v => String(v || '').trim()).filter(Boolean))];
+    localStorage.setItem(chave, JSON.stringify(limpa));
+    return limpa;
+}
+
+var OPCOES_TIPO_PLANO = atlasListaConfig('atlas_config_tipos_painel', ["5 Ondas", "Fachada Oculta", "Fachada Visível", "Telha Canudo"]);
 var OPCOES_ESPESSURA_PLANO = [30, 40, 50, 60, 80, 100, 120];
-var OPCOES_RAL_SUP = ["9010", "9006", "MAD.NATURAL"];
-var OPCOES_RAL_INF = ["3009", "9010", "7016", "9006"];
+var OPCOES_RAL_SUP = atlasListaConfig('atlas_config_ral_superior', ["9010", "9006", "7016"]);
+var OPCOES_RAL_INF = atlasListaConfig('atlas_config_ral_inferior', ["3009", "9010", "6009", "9006", "9005", "8004 T", "8004 L", "7016"]);
+var OPCOES_ESP_CHAPA = atlasListaConfig('atlas_config_esp_chapa', ["0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"]);
 var OPCOES_QUALIDADE = ["P1", "P2", "Descarte"];
 var MESES_PT = ["", "JANEIRO", "FEVEREIRO", "MARCO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
 
@@ -3723,14 +3739,70 @@ function abrirAjustesSistema() {
             </h2>
         </div>
 
-        <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
-            <h3 style="margin-top:0; margin-bottom:10px;">Em desenvolvimento</h3>
-            <p style="color:#94a3b8; font-size:13px;">
-                Aqui depois podemos colocar:
-                destinos do plano, limpar históricos, RAL, tipos de painel, espessuras e outras ferramentas do sistema.
-            </p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+            ${htmlEditorListaSistema('Clientes / destinos', 'atlas_plano_destinos', destinosPlano, 'destinosPlano')}
+            ${htmlEditorListaSistema('Tipos de chapa / painel', 'atlas_config_tipos_painel', OPCOES_TIPO_PLANO, 'OPCOES_TIPO_PLANO')}
+            ${htmlEditorListaSistema('RAL inferior', 'atlas_config_ral_inferior', OPCOES_RAL_INF, 'OPCOES_RAL_INF')}
+            ${htmlEditorListaSistema('RAL superior', 'atlas_config_ral_superior', OPCOES_RAL_SUP, 'OPCOES_RAL_SUP')}
+            ${htmlEditorListaSistema('Espessura de chapa opcional', 'atlas_config_esp_chapa', OPCOES_ESP_CHAPA, 'OPCOES_ESP_CHAPA')}
         </div>
     `;
+}
+
+function htmlEditorListaSistema(titulo, chave, lista, variavel) {
+    const id = chave.replace(/[^a-z0-9_]/gi, '_');
+    return `
+        <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+            <h3 style="margin-top:0; margin-bottom:10px;">${titulo}</h3>
+            <div id="${id}-lista" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+                ${(lista || []).map((valor, index) => `
+                    <div style="display:flex; gap:8px; align-items:center; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:8px;">
+                        <span style="flex:1;">${textoSeguroConferencia(valor)}</span>
+                        <button onclick="removerItemListaSistema('${chave}','${variavel}',${index})" style="background:#7f1d1d; color:white; border:none; border-radius:6px; padding:8px 10px; font-weight:bold;">X</button>
+                    </div>
+                `).join('') || `<div style="color:#94a3b8;">Nenhum item.</div>`}
+            </div>
+            <div style="display:flex; gap:8px;">
+                <input id="${id}-novo" placeholder="Novo item" style="flex:1; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                <button onclick="adicionarItemListaSistema('${chave}','${variavel}','${id}-novo')" style="background:#10b981; color:white; border:none; border-radius:8px; padding:12px; font-weight:bold;">ADICIONAR</button>
+            </div>
+        </div>
+    `;
+}
+
+function atualizarVariavelListaSistema(variavel, lista) {
+    if (variavel === 'destinosPlano') destinosPlano = lista;
+    if (variavel === 'OPCOES_TIPO_PLANO') OPCOES_TIPO_PLANO = lista;
+    if (variavel === 'OPCOES_RAL_INF') OPCOES_RAL_INF = lista;
+    if (variavel === 'OPCOES_RAL_SUP') OPCOES_RAL_SUP = lista;
+    if (variavel === 'OPCOES_ESP_CHAPA') OPCOES_ESP_CHAPA = lista;
+}
+
+function obterVariavelListaSistema(variavel) {
+    if (variavel === 'destinosPlano') return destinosPlano;
+    if (variavel === 'OPCOES_TIPO_PLANO') return OPCOES_TIPO_PLANO;
+    if (variavel === 'OPCOES_RAL_INF') return OPCOES_RAL_INF;
+    if (variavel === 'OPCOES_RAL_SUP') return OPCOES_RAL_SUP;
+    if (variavel === 'OPCOES_ESP_CHAPA') return OPCOES_ESP_CHAPA;
+    return [];
+}
+
+function adicionarItemListaSistema(chave, variavel, idInput) {
+    const input = document.getElementById(idInput);
+    const valor = input?.value.trim();
+    if (!valor) return alert('Informe um valor.');
+
+    const atual = obterVariavelListaSistema(variavel);
+    const lista = atlasSalvarListaConfig(chave, [...atual, valor]);
+    atualizarVariavelListaSistema(variavel, lista);
+    abrirAjustesSistema();
+}
+
+function removerItemListaSistema(chave, variavel, index) {
+    const atual = obterVariavelListaSistema(variavel);
+    const lista = atlasSalvarListaConfig(chave, atual.filter((_, i) => i !== index));
+    atualizarVariavelListaSistema(variavel, lista);
+    abrirAjustesSistema();
 }
 
 function exportarBackupSistema() {
@@ -5242,6 +5314,10 @@ function abrirPedidoConferenciaSerra(idPedido) {
                     FINALIZAR PEDIDO
                 </button>
             ` : ''}
+
+            <button onclick="excluirPedidoConferenciaSerra(${pedido.id})" style="width:100%; background:#7f1d1d; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; margin-top:10px;">
+                EXCLUIR PEDIDO DA CONFERÊNCIA
+            </button>
         </div>
     `;
 }
@@ -5331,6 +5407,23 @@ function finalizarPedidoConferenciaSerra(idPedido) {
 
     salvarConferenciaSerra();
     abrirPedidoConferenciaSerra(idPedido);
+}
+
+function excluirPedidoConferenciaSerra(idPedido) {
+    const index = db_conferencia_serra.findIndex(p => String(p.id) === String(idPedido));
+    if (index < 0) return alert('Pedido não encontrado.');
+
+    const pedido = db_conferencia_serra[index];
+    if (!confirm(`Excluir da conferência o pedido ${pedido.pedidoNumero}?`)) return;
+
+    if (typeof atlasLixeiraEnviar === 'function') {
+        atlasLixeiraEnviar('Conferência', `Pedido ${pedido.pedidoNumero} - ${pedido.data || 'sem data'}`, 'atlas_conferencia_serra', pedido);
+    }
+
+    db_conferencia_serra.splice(index, 1);
+    salvarConferenciaSerra();
+    renderizarMenuConferenciaSerra();
+    alert('Pedido movido para a lixeira.');
 }
 /* ==========================================================
    BOTÃO VOLTAR INTELIGENTE - VOLTA PARA O ÚLTIMO CLIQUE
@@ -5638,6 +5731,13 @@ function atlasLixeiraRestaurarItem(item) {
         if (item.chave === 'atlas_serra_hist') db_serra_hist = hist;
         if (item.chave === 'atlas_emb_hist') db_emb_hist = hist;
         if (item.chave === 'atlas_plano_hist') db_plano_hist = hist;
+        return true;
+    }
+
+    if (item.chave === 'atlas_conferencia_serra') {
+        db_conferencia_serra = JSON.parse(localStorage.getItem('atlas_conferencia_serra')) || [];
+        db_conferencia_serra.unshift(item.dados);
+        localStorage.setItem('atlas_conferencia_serra', JSON.stringify(db_conferencia_serra));
         return true;
     }
 

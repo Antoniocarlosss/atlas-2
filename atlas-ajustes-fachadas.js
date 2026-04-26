@@ -7,9 +7,9 @@
     if (window.atlasAjustesFachadas2026Ativo) return;
     window.atlasAjustesFachadas2026Ativo = true;
 
-    const TIPOS_PAINEL_ATLAS = ["5 Ondas", "Fachada Oculta", "Fachada Visível", "Telha Canudo"];
+    const TIPOS_PAINEL_ATLAS = window.OPCOES_TIPO_PLANO || ["5 Ondas", "Fachada Oculta", "Fachada Visível", "Telha Canudo"];
     const ACABAMENTOS_ATLAS = ["Canelada", "Micronervurada", "Lisa"];
-    const ESP_CHAPA_ATLAS = ["", "0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"];
+    const ESP_CHAPA_ATLAS = ["", ...(window.OPCOES_ESP_CHAPA || ["0.28", "0.30", "0.32", "0.35", "0.38", "0.40", "0.43", "0.45", "0.50", "0.60", "0.68"])];
 
     window.OPCOES_TIPO_PLANO = TIPOS_PAINEL_ATLAS;
 
@@ -31,8 +31,7 @@
     }
 
     function painelTemDetalhesAtlas(tipo) {
-        const normalizado = normalizarTipoPainelAtlas(tipo);
-        return normalizado === "Fachada Oculta" || normalizado === "Fachada Visível";
+        return !!normalizarTipoPainelAtlas(tipo);
     }
 
     function htmlOpcoes(lista, selecionado) {
@@ -42,7 +41,7 @@
     function htmlCamposDetalhesPainel(prefixo, item) {
         return `
             <div id="${prefixo}-detalhes-painel" style="display:none; background:#111827; border:1px solid #334155; border-radius:10px; padding:12px; margin:10px 0;">
-                <div style="color:#f59e0b; font-size:12px; font-weight:bold; margin-bottom:10px;">DETALHES DA FACHADA</div>
+                <div style="color:#f59e0b; font-size:12px; font-weight:bold; margin-bottom:10px;">DETALHES DA CHAPA</div>
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                     <div>
@@ -304,8 +303,12 @@
 
         const rals = `
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                <input id="s-ral-i-serra" placeholder="RAL INF" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
-                <input id="s-ral-s-serra" placeholder="RAL SUP" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <select id="s-ral-i-serra" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                    ${(window.OPCOES_RAL_INF || []).map(v => `<option value="${v}">INF: ${v}</option>`).join("")}
+                </select>
+                <select id="s-ral-s-serra" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                    ${(window.OPCOES_RAL_SUP || []).map(v => `<option value="${v}">SUP: ${v}</option>`).join("")}
+                </select>
             </div>
         `;
 
@@ -471,8 +474,12 @@
 
         const rals = `
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                <input id="s-ral-i" placeholder="RAL INF" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
-                <input id="s-ral-s" placeholder="RAL SUP" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                <select id="s-ral-i" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                    ${(window.OPCOES_RAL_INF || []).map(v => `<option value="${v}">INF: ${v}</option>`).join("")}
+                </select>
+                <select id="s-ral-s" style="padding:10px; background:#1e293b; color:white; border:1px solid #334155; border-radius:5px;">
+                    ${(window.OPCOES_RAL_SUP || []).map(v => `<option value="${v}">SUP: ${v}</option>`).join("")}
+                </select>
             </div>
         `;
 
