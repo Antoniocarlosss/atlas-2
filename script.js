@@ -79,7 +79,7 @@ function aplicarPreferenciasVisuaisUsuario() {
             return;
         }
 
-        if (['gestao', 'conferencia', 'lixeira', 'pesquisa_encomenda'].includes(nomeModulo)) {
+        if (['gestao', 'conferencia', 'stock', 'lixeira', 'pesquisa_encomenda'].includes(nomeModulo)) {
             const podeVerRestrito = usuarioEhAdminSupervisor();
             card.style.display = podeVerRestrito ? '' : 'none';
             return;
@@ -143,7 +143,7 @@ function fecharModal() {
 
 
 function abrirModulo(nome) {
-    if (['gestao', 'conferencia', 'lixeira', 'pesquisa_encomenda'].includes(nome) && !usuarioEhAdminSupervisor()) {
+    if (['gestao', 'conferencia', 'stock', 'lixeira', 'pesquisa_encomenda'].includes(nome) && !usuarioEhAdminSupervisor()) {
         alert("Apenas ADMIN ou SUPERVISOR podem acessar esta área.");
         return;
     }
