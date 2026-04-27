@@ -13,17 +13,33 @@ const MODULOS_SISTEMA = [
     { chave: 'stock', nome: 'Stock' },
     { chave: 'gestao', nome: 'Gestão' },
     { chave: 'config', nome: 'Ajustes' },
-    { chave: 'lixeira', nome: 'Lixeira' }
+    { chave: 'lixeira', nome: 'Lixeira' },
+    { chave: 'permissoes', nome: 'PermissÃµes' }
 ];
 
 function obterChavePreferenciasUsuario(idUsuario) {
     return `atlas_pref_${String(idUsuario || '').toLowerCase()}`;
 }
 
-function obterPreferenciasPadraoUsuario() {
+function obterCargoUsuarioPorId(idUsuario) {
+    const usuario = usuariosSistema.find(u => String(u.id).toLowerCase() === String(idUsuario || '').toLowerCase());
+    return usuario?.cargo || (usuarioLogado && String(usuarioLogado.id).toLowerCase() === String(idUsuario || '').toLowerCase() ? usuarioLogado.cargo : 'operario');
+}
+
+function obterPreferenciasPadraoUsuario(idUsuario) {
+    const cargo = obterCargoUsuarioPorId(idUsuario);
+    const basicos = ['injecao', 'bobines', 'serra', 'embalagem', 'plano', 'config'];
+    const restritos = ['gestao', 'conferencia', 'stock', 'lixeira', 'pesquisa_encomenda'];
+    const modulosVisiveis = cargo === 'admin'
+        ? [...basicos, ...restritos, 'permissoes']
+        : (cargo === 'supervisor' ? [...basicos, ...restritos] : basicos);
+    const modulosEditaveis = cargo === 'admin'
+        ? [...basicos, ...restritos, 'permissoes']
+        : (cargo === 'supervisor' ? ['plano', 'conferencia', 'stock'] : []);
     return {
         tema: 'escuro',
-        modulosVisiveis: ['injecao', 'bobines', 'serra', 'embalagem', 'plano', 'stock', 'config', 'lixeira']
+        modulosVisiveis,
+        modulosEditaveis
     };
 }
 
@@ -31,20 +47,43 @@ function usuarioEhAdminSupervisor() {
     return usuarioLogado && (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor');
 }
 
+function usuarioEhAdmin() {
+    return usuarioLogado && usuarioLogado.cargo === 'admin';
+}
+
+function usuarioPodeVerModulo(chave) {
+    if (!usuarioLogado) return false;
+    if (usuarioLogado.cargo === 'admin') return true;
+    return obterPreferenciasUsuario(usuarioLogado.id).modulosVisiveis.includes(chave);
+}
+
+function usuarioPodeEditarModulo(chave) {
+    if (!usuarioLogado) return false;
+    if (usuarioLogado.cargo === 'admin') return true;
+    return obterPreferenciasUsuario(usuarioLogado.id).modulosEditaveis.includes(chave);
+}
+
 function obterPreferenciasUsuario(idUsuario) {
     const chave = obterChavePreferenciasUsuario(idUsuario);
     const salvas = JSON.parse(localStorage.getItem(chave));
 
     if (!salvas) {
-        return obterPreferenciasPadraoUsuario();
+        return obterPreferenciasPadraoUsuario(idUsuario);
     }
 
-    const padrao = obterPreferenciasPadraoUsuario();
+    const padrao = obterPreferenciasPadraoUsuario(idUsuario);
+    const cargo = obterCargoUsuarioPorId(idUsuario);
+    if (cargo === 'operario' && !salvas.permissoesAdminDefinidas) {
+        return { ...padrao, tema: salvas.tema || padrao.tema };
+    }
     const modulosSalvos = Array.isArray(salvas.modulosVisiveis) ? salvas.modulosVisiveis : padrao.modulosVisiveis;
+    const editaveisSalvos = Array.isArray(salvas.modulosEditaveis) ? salvas.modulosEditaveis : padrao.modulosEditaveis;
 
     return {
         tema: salvas.tema || 'escuro',
-        modulosVisiveis: [...new Set([...modulosSalvos, 'stock', 'lixeira'])]
+        modulosVisiveis: [...new Set(cargo === 'admin' ? [...modulosSalvos, 'permissoes'] : modulosSalvos)],
+        modulosEditaveis: [...new Set(cargo === 'admin' ? [...editaveisSalvos, ...MODULOS_SISTEMA.map(m => m.chave)] : editaveisSalvos)],
+        permissoesAdminDefinidas: salvas.permissoesAdminDefinidas === true
     };
 }
 
@@ -74,18 +113,12 @@ function aplicarPreferenciasVisuaisUsuario() {
 
         const nomeModulo = match[1];
 
-        if (nomeModulo === 'config') {
-            card.style.display = '';
+        if (nomeModulo === 'permissoes') {
+            card.style.display = usuarioEhAdmin() ? '' : 'none';
             return;
         }
 
-        if (['gestao', 'conferencia', 'stock', 'lixeira', 'pesquisa_encomenda'].includes(nomeModulo)) {
-            const podeVerRestrito = usuarioEhAdminSupervisor();
-            card.style.display = podeVerRestrito ? '' : 'none';
-            return;
-        }
-
-        card.style.display = preferencias.modulosVisiveis.includes(nomeModulo) ? '' : 'none';
+        card.style.display = usuarioPodeVerModulo(nomeModulo) ? '' : 'none';
     });
 }
 
@@ -143,8 +176,12 @@ function fecharModal() {
 
 
 function abrirModulo(nome) {
-    if (['gestao', 'conferencia', 'stock', 'lixeira', 'pesquisa_encomenda'].includes(nome) && !usuarioEhAdminSupervisor()) {
+    if (nome === 'permissoes' && !usuarioEhAdmin()) {
         alert("Apenas ADMIN ou SUPERVISOR podem acessar esta área.");
+        return;
+    }
+    if (!usuarioPodeVerModulo(nome)) {
+        alert("Sem permissao para acessar esta area.");
         return;
     }
 
@@ -159,7 +196,8 @@ function abrirModulo(nome) {
         plano: "PLANO",
         stock: "STOCK",
         gestao: "GESTÃO",
-        config: "AJUSTES"
+        config: "AJUSTES",
+        permissoes: "PERMISSOES"
     };
 
     document.getElementById('titulo-modulo').innerText = titulos[nome];
@@ -186,6 +224,9 @@ function abrirModulo(nome) {
     }
     else if (nome === 'stock') {
         renderizarMenuStockAtlas();
+    }
+    else if (nome === 'permissoes') {
+        renderizarPermissoesAdmin();
     }
     else if (nome === 'gestao') {
         renderizarMenuGestao();
@@ -2653,7 +2694,7 @@ function aplicarPermissoesUsuario() {
     const cardGestao = document.getElementById('card-gestao');
     if (!cardGestao || !usuarioLogado) return;
 
-    if (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor') {
+    if (usuarioPodeVerModulo('gestao')) {
         cardGestao.style.display = '';
     } else {
         cardGestao.style.display = 'none';
@@ -2755,7 +2796,7 @@ function espumaPadraoInjecao(tipoPainel) {
 
 function usuarioPodeCriarPlano() {
     if (!usuarioLogado) return false;
-    return usuarioLogado.cargo !== 'operador' && usuarioLogado.cargo !== 'operario';
+    return usuarioPodeEditarModulo('plano');
 }
 function usuarioPodeVerAnalisePlano() {
     if (!usuarioLogado) return false;
@@ -4049,6 +4090,7 @@ function salvarTemaUsuario() {
 
 function salvarModulosVisiveis() {
     if (!usuarioLogado) return;
+    if (!usuarioEhAdmin()) return alert('Somente ADMIN pode alterar permissões de módulos. Use o módulo Permissões.');
 
     const checks = document.querySelectorAll('.check-modulo-ajustes:checked');
     const modulosSelecionados = Array.from(checks).map(el => el.value);
@@ -4067,6 +4109,68 @@ function salvarModulosVisiveis() {
 
     alert('Módulos atualizados com sucesso.');
 }
+
+function renderizarPermissoesAdmin(idSelecionado = '') {
+    if (!usuarioEhAdmin()) return alert('Apenas ADMIN pode acessar permissoes.');
+    const render = document.getElementById('render-modulo');
+    if (!render) return;
+
+    const usuariosEditaveis = usuariosSistema.filter(u => u.id !== 'admin');
+    const usuarioAlvo = usuariosSistema.find(u => u.id === idSelecionado) || usuariosEditaveis[0] || usuariosSistema[0];
+    if (!usuarioAlvo) {
+        render.innerHTML = `<div style="padding:20px; color:white;">Nenhum usuario cadastrado.</div>`;
+        return;
+    }
+
+    const prefs = obterPreferenciasUsuario(usuarioAlvo.id);
+    const modulos = MODULOS_SISTEMA
+        .filter((mod, index, self) => self.findIndex(m => m.chave === mod.chave) === index)
+        .filter(mod => mod.chave !== 'permissoes' || usuarioAlvo.cargo === 'admin');
+
+    render.innerHTML = `
+        <div style="padding:15px; color:white;">
+            <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px; margin-bottom:15px;">
+                <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:8px;">USUARIO</label>
+                <select id="perm-usuario" onchange="renderizarPermissoesAdmin(this.value)" style="width:100%; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
+                    ${usuariosSistema.map(u => `<option value="${u.id}" ${u.id === usuarioAlvo.id ? 'selected' : ''}>${u.id.toUpperCase()} - ${u.cargo.toUpperCase()}</option>`).join('')}
+                </select>
+            </div>
+            <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; overflow:hidden;">
+                <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; padding:12px; background:#0f172a; font-weight:bold;">
+                    <span>Modulo</span><span style="text-align:center;">Pode ver</span><span style="text-align:center;">Pode editar</span>
+                </div>
+                ${modulos.map(mod => `
+                    <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; align-items:center; padding:12px; border-top:1px solid #334155;">
+                        <span>${mod.nome}</span>
+                        <label style="text-align:center;"><input class="perm-ver" type="checkbox" value="${mod.chave}" ${prefs.modulosVisiveis.includes(mod.chave) ? 'checked' : ''}></label>
+                        <label style="text-align:center;"><input class="perm-editar" type="checkbox" value="${mod.chave}" ${prefs.modulosEditaveis.includes(mod.chave) ? 'checked' : ''}></label>
+                    </div>
+                `).join('')}
+            </div>
+            <button onclick="salvarPermissoesAdmin('${usuarioAlvo.id}')" style="width:100%; margin-top:15px; background:#10b981; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold;">SALVAR PERMISSOES</button>
+        </div>
+    `;
+}
+
+function salvarPermissoesAdmin(idUsuario) {
+    if (!usuarioEhAdmin()) return alert('Apenas ADMIN pode salvar permissoes.');
+    const usuarioAlvo = usuariosSistema.find(u => u.id === idUsuario);
+    if (!usuarioAlvo) return alert('Usuario nao encontrado.');
+    if (usuarioAlvo.id === 'admin') return alert('O ADMIN sempre tem acesso total.');
+
+    const visiveis = Array.from(document.querySelectorAll('.perm-ver:checked')).map(el => el.value);
+    const editaveis = Array.from(document.querySelectorAll('.perm-editar:checked')).map(el => el.value).filter(chave => visiveis.includes(chave));
+    if (!visiveis.includes('config')) visiveis.push('config');
+
+    const prefs = obterPreferenciasUsuario(idUsuario);
+    prefs.modulosVisiveis = [...new Set(visiveis)];
+    prefs.modulosEditaveis = [...new Set(editaveis)];
+    prefs.permissoesAdminDefinidas = true;
+    salvarPreferenciasUsuario(idUsuario, prefs);
+    alert('Permissoes atualizadas com sucesso.');
+    renderizarPermissoesAdmin(idUsuario);
+}
+
 function aplicarTemaUsuario(tema) {
     document.body.classList.toggle('tema-claro', tema === 'claro');
 
@@ -4093,7 +4197,7 @@ function aplicarTemaUsuario(tema) {
    ========================================================== */
 
 function usuarioPodeEditarPlanoHistorico() {
-    return usuarioLogado && (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor');
+    return usuarioPodeEditarModulo('plano');
 }
 
 function recalcularPlanoHistorico(rel) {
@@ -5155,6 +5259,7 @@ if (typeof MODULOS_SISTEMA !== 'undefined' && !MODULOS_SISTEMA.some(m => m.chave
 const abrirModuloOriginalConferencia = abrirModulo;
 abrirModulo = function(nome) {
     if (nome === 'conferencia') {
+        if (!usuarioPodeVerModulo('conferencia')) return alert('Sem permissao para acessar esta area.');
         document.getElementById('grid-home').style.display = 'none';
         document.getElementById('conteudo-modulo').style.display = 'block';
         document.getElementById('titulo-modulo').innerText = 'CONFERÊNCIA';
@@ -5170,7 +5275,7 @@ aplicarPreferenciasVisuaisUsuario = function() {
     aplicarPreferenciasOriginalConferencia();
 
     const card = document.getElementById('card-conferencia');
-    if (card) card.style.display = '';
+    if (card) card.style.display = usuarioPodeVerModulo('conferencia') ? '' : 'none';
 };
 
 function salvarConferenciaSerra() {
@@ -5504,6 +5609,7 @@ function abrirPedidoConferenciaSerra(idPedido) {
 }
 
 function marcarUnidadeConferenciaSerra(idPedido, idUnidade, status) {
+    if (!usuarioPodeEditarModulo('conferencia')) return alert('Sem permissao para editar Conferencia.');
     const pedido = db_conferencia_serra.find(p => String(p.id) === String(idPedido));
     if (!pedido || pedido.status === 'finalizado') return;
 
@@ -5535,6 +5641,7 @@ function marcarUnidadeConferenciaSerra(idPedido, idUnidade, status) {
 }
 
 function adicionarMotivoConferenciaSerra(idPedido, idUnidade) {
+    if (!usuarioPodeEditarModulo('conferencia')) return alert('Sem permissao para editar Conferencia.');
     const pedido = db_conferencia_serra.find(p => String(p.id) === String(idPedido));
     if (!pedido || pedido.status === 'finalizado') return;
 
@@ -5560,6 +5667,7 @@ function adicionarMotivoConferenciaSerra(idPedido, idUnidade) {
 }
 
 function finalizarPedidoConferenciaSerra(idPedido) {
+    if (!usuarioPodeEditarModulo('conferencia')) return alert('Sem permissao para editar Conferencia.');
     const pedido = db_conferencia_serra.find(p => String(p.id) === String(idPedido));
     if (!pedido) return;
 
@@ -5591,6 +5699,7 @@ function finalizarPedidoConferenciaSerra(idPedido) {
 }
 
 function excluirPedidoConferenciaSerra(idPedido) {
+    if (!usuarioPodeEditarModulo('conferencia')) return alert('Sem permissao para editar Conferencia.');
     const index = db_conferencia_serra.findIndex(p => String(p.id) === String(idPedido));
     if (index < 0) return alert('Pedido não encontrado.');
 
@@ -6028,6 +6137,7 @@ function atlasInstalarLixeira() {
         window.abrirModuloOriginalLixeiraAtlas = abrirModulo;
         abrirModulo = function(nome) {
             if (nome === 'lixeira') {
+                if (!usuarioPodeVerModulo('lixeira')) return alert('Sem permissao para acessar a lixeira.');
                 document.getElementById('grid-home').style.display = 'none';
                 document.getElementById('conteudo-modulo').style.display = 'block';
                 document.getElementById('titulo-modulo').innerText = 'LIXEIRA';
@@ -6404,6 +6514,7 @@ function renderizarListaBobinasStock(lista, rotuloVazio) {
 }
 
 function cadastrarBobinaStockAtlas() {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const numero = document.getElementById('stock-bob-num')?.value.trim();
     const ral = document.getElementById('stock-bob-ral')?.value;
     const medida = document.getElementById('stock-bob-medida')?.value;
@@ -6419,6 +6530,7 @@ function cadastrarBobinaStockAtlas() {
 }
 
 function baixarBobinaStockAtlas(id) {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
     item.qtd = Math.max(0, Number(item.qtd || 0) - 1);
@@ -6437,6 +6549,7 @@ function baixarBobinaStockAtlas(id) {
 }
 
 function editarBobinaStockAtlas(id) {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
     const numero = prompt('Numero da bobina:', item.numero || '');
@@ -6466,6 +6579,7 @@ function editarBobinaStockAtlas(id) {
 }
 
 function excluirBobinaStockAtlas(id) {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
     if (!confirm(`Excluir bobina ${item.numero || ''}?`)) return;
@@ -6475,6 +6589,7 @@ function excluirBobinaStockAtlas(id) {
 }
 
 function fecharBobinaStockAtlas(id) {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
     item.status = 'acabada_mes';
@@ -6599,6 +6714,7 @@ function renderizarStockFilmesAtlas(termoBusca = '') {
 }
 
 function cadastrarFilmeStockAtlas() {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const tipo = normalizarNomeFilmeStock(document.getElementById('stock-film-tipo')?.value);
     const fornecedor = document.getElementById('stock-film-forn')?.value.trim();
     const qtd = Number(document.getElementById('stock-film-qtd')?.value || 1);
@@ -6617,6 +6733,7 @@ function cadastrarFilmeStockAtlas() {
 }
 
 function baixarFilmeStockAtlas(id) {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const item = atlasStockFilmes.find(f => String(f.id) === String(id));
     if (!item) return;
     item.qtd = Math.max(0, Number(item.qtd || 0) - 1);
@@ -6628,6 +6745,7 @@ function baixarFilmeStockAtlas(id) {
 }
 
 function editarFilmeStockAtlas(id) {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const item = atlasStockFilmes.find(f => String(f.id) === String(id));
     if (!item) return;
     const tipo = prompt('Tipo do filme:', item.tipo || '');
@@ -6646,6 +6764,7 @@ function editarFilmeStockAtlas(id) {
 }
 
 function excluirFilmeStockAtlas(id) {
+    if (!usuarioPodeEditarModulo('stock')) return alert('Sem permissao para editar Stock.');
     const item = atlasStockFilmes.find(f => String(f.id) === String(id));
     if (!item) return;
     if (!confirm(`Excluir filme ${item.tipo || ''}?`)) return;
@@ -6905,13 +7024,13 @@ function excluirFilmeStockAtlas(id) {
         atlasGarantirCardPesquisaEncomenda();
 
         const card = document.getElementById('card-pesquisa-encomenda');
-        if (card) card.style.display = usuarioEhAdminSupervisor() ? '' : 'none';
+        if (card) card.style.display = usuarioPodeVerModulo('pesquisa_encomenda') ? '' : 'none';
     };
 
     const abrirModuloOriginalPesquisa = window.abrirModulo;
     window.abrirModulo = function(nome) {
         if (nome === 'pesquisa_encomenda') {
-            if (!usuarioEhAdminSupervisor()) return alert('Apenas ADMIN ou SUPERVISOR podem pesquisar encomendas.');
+            if (!usuarioPodeVerModulo('pesquisa_encomenda')) return alert('Sem permissao para pesquisar encomendas.');
             document.getElementById('grid-home').style.display = 'none';
             document.getElementById('conteudo-modulo').style.display = 'block';
             document.getElementById('titulo-modulo').innerText = 'PESQUISAR ENCOMENDA';
