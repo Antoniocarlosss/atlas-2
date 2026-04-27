@@ -21,9 +21,14 @@ function obterChavePreferenciasUsuario(idUsuario) {
     return `atlas_pref_${String(idUsuario || '').toLowerCase()}`;
 }
 
+function normalizarCargoUsuario(cargo) {
+    return String(cargo || 'operario').trim().toLowerCase();
+}
+
 function obterCargoUsuarioPorId(idUsuario) {
     const usuario = usuariosSistema.find(u => String(u.id).toLowerCase() === String(idUsuario || '').toLowerCase());
-    return usuario?.cargo || (usuarioLogado && String(usuarioLogado.id).toLowerCase() === String(idUsuario || '').toLowerCase() ? usuarioLogado.cargo : 'operario');
+    const cargo = usuario?.cargo || (usuarioLogado && String(usuarioLogado.id).toLowerCase() === String(idUsuario || '').toLowerCase() ? usuarioLogado.cargo : 'operario');
+    return normalizarCargoUsuario(cargo);
 }
 
 function obterPreferenciasPadraoUsuario(idUsuario) {
@@ -44,22 +49,23 @@ function obterPreferenciasPadraoUsuario(idUsuario) {
 }
 
 function usuarioEhAdminSupervisor() {
-    return usuarioLogado && (usuarioLogado.cargo === 'admin' || usuarioLogado.cargo === 'supervisor');
+    const cargo = normalizarCargoUsuario(usuarioLogado?.cargo);
+    return usuarioLogado && (cargo === 'admin' || cargo === 'supervisor');
 }
 
 function usuarioEhAdmin() {
-    return usuarioLogado && usuarioLogado.cargo === 'admin';
+    return usuarioLogado && normalizarCargoUsuario(usuarioLogado.cargo) === 'admin';
 }
 
 function usuarioPodeVerModulo(chave) {
     if (!usuarioLogado) return false;
-    if (usuarioLogado.cargo === 'admin') return true;
+    if (normalizarCargoUsuario(usuarioLogado.cargo) === 'admin') return true;
     return obterPreferenciasUsuario(usuarioLogado.id).modulosVisiveis.includes(chave);
 }
 
 function usuarioPodeEditarModulo(chave) {
     if (!usuarioLogado) return false;
-    if (usuarioLogado.cargo === 'admin') return true;
+    if (normalizarCargoUsuario(usuarioLogado.cargo) === 'admin') return true;
     return obterPreferenciasUsuario(usuarioLogado.id).modulosEditaveis.includes(chave);
 }
 
