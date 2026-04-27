@@ -842,10 +842,11 @@ function setLado(lado) {
     if(lancamentoAtual.tipo === 'filme') {
         let html = (lado === 'inferior') ? `
             <select id="subtipo_filme" class="input-style">
-                <option value="5 Ondas">5 Ondas</option>
-                <option value="Fachada Oculta">Fachada Oculta</option>
-                <option value="Telha Canudo">Telha Canudo</option>
-            </select>` : `<p style="font-size:13px; color:#94a3b8; margin-bottom:10px;">Tipo: 1060</p>`;
+                <option value="5 Ondas - 1265">5 Ondas - 1265</option>
+                <option value="Fachada/Chapa superior - 1060">Fachada/Chapa superior - 1060</option>
+                <option value="Fachada/Chapa superior - 1065">Fachada/Chapa superior - 1065</option>
+                <option value="Filme Telha Canudo">Filme Telha Canudo</option>
+            </select>` : `<p style="font-size:13px; color:#94a3b8; margin-bottom:10px;">Tipo: Fachada/Chapa superior - 1060</p>`;
         
         html += `
             <label style="display:block; margin-bottom:10px; font-size:12px; color:#94a3b8;">QUANTIDADE</label>
@@ -933,7 +934,7 @@ function adicionarAoLancamento() {
     if(!lancamentoAtual.lado) { alert('Selecione a posição!'); return; }
 
     if(lancamentoAtual.tipo === 'filme') {
-        lancamentoAtual.subtipo = (lancamentoAtual.lado === 'superior') ? '1060' : document.getElementById('subtipo_filme').value;
+        lancamentoAtual.subtipo = (lancamentoAtual.lado === 'superior') ? 'Fachada/Chapa superior - 1060' : document.getElementById('subtipo_filme').value;
     } else {
         lancamentoAtual.numBobine = document.getElementById('num_bobine').value;
         lancamentoAtual.ral = document.getElementById('ral_chapa').value;
@@ -6383,6 +6384,8 @@ function renderizarListaBobinasStock(lista, rotuloVazio) {
                     <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
                     <div style="display:flex; gap:8px;">
                         ${item.status !== 'acabada_mes' ? `<button onclick="baixarBobinaStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button><button onclick="fecharBobinaStockAtlas('${item.id}')" style="background:#64748b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">ACABOU</button>` : ''}
+                        <button onclick="editarBobinaStockAtlas('${item.id}')" style="background:#f59e0b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">EDITAR</button>
+                        <button onclick="excluirBobinaStockAtlas('${item.id}')" style="background:#ef4444; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">EXCLUIR</button>
                     </div>
                 </div>
             `).join('')}
@@ -6424,6 +6427,44 @@ function baixarBobinaStockAtlas(id) {
     renderizarStockBobinasAtlas();
 }
 
+function editarBobinaStockAtlas(id) {
+    const item = atlasStockBobinas.find(b => String(b.id) === String(id));
+    if (!item) return;
+    const numero = prompt('Numero da bobina:', item.numero || '');
+    if (numero === null) return;
+    const ral = prompt('RAL:', item.ral || '');
+    if (ral === null) return;
+    const medida = prompt('Medida:', item.medida || '');
+    if (medida === null) return;
+    const espessura = prompt('Espessura:', item.espessura || '');
+    if (espessura === null) return;
+    const fornecedor = prompt('Fornecedor:', item.fornecedor || '');
+    if (fornecedor === null) return;
+    const qtd = prompt('Quantidade:', item.qtd || 0);
+    if (qtd === null) return;
+
+    Object.assign(item, {
+        numero: numero.trim(),
+        ral: ral.trim(),
+        medida: medida.trim(),
+        espessura: espessura.trim(),
+        fornecedor: fornecedor.trim(),
+        qtd: Math.max(0, Number(qtd) || 0)
+    });
+    registrarHistoricoBobinaStock(item, 'Bobina editada no Stock');
+    salvarStockAtlas();
+    renderizarStockBobinasAtlas();
+}
+
+function excluirBobinaStockAtlas(id) {
+    const item = atlasStockBobinas.find(b => String(b.id) === String(id));
+    if (!item) return;
+    if (!confirm(`Excluir bobina ${item.numero || ''}?`)) return;
+    atlasStockBobinas = atlasStockBobinas.filter(b => String(b.id) !== String(id));
+    salvarStockAtlas();
+    renderizarStockBobinasAtlas();
+}
+
 function fecharBobinaStockAtlas(id) {
     const item = atlasStockBobinas.find(b => String(b.id) === String(id));
     if (!item) return;
@@ -6461,8 +6502,30 @@ function htmlResumoFilmesStock(lista) {
     `;
 }
 
+function migrarFilmesDuplicadosStockAtlas() {
+    const mapa = {};
+    let alterou = false;
+    (atlasStockFilmes || []).forEach(item => {
+        const tipo = item.tipo || 'SEM TIPO';
+        const fornecedor = item.fornecedor || 'SEM FORNECEDOR';
+        const chave = `${normalizarStockAtlas(tipo)}|||${normalizarStockAtlas(fornecedor)}`;
+        if (!mapa[chave]) {
+            mapa[chave] = { ...item, tipo, fornecedor, qtd: Number(item.qtd || 0), historico: [...(item.historico || [])] };
+            return;
+        }
+        mapa[chave].qtd += Number(item.qtd || 0);
+        mapa[chave].historico = [...(mapa[chave].historico || []), ...(item.historico || [])];
+        alterou = true;
+    });
+    if (alterou) {
+        atlasStockFilmes = Object.values(mapa);
+        salvarStockAtlas();
+    }
+}
+
 function renderizarStockFilmesAtlas(termoBusca = '') {
     atlasStockFilmes = JSON.parse(localStorage.getItem('atlas_stock_filmes')) || [];
+    migrarFilmesDuplicadosStockAtlas();
     const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
     if (!c) return;
     const tipos = ['5 Ondas - 1265', 'Fachada/Chapa superior - 1060', 'Fachada/Chapa superior - 1065', 'Filme Telha Canudo'];
@@ -6493,7 +6556,11 @@ function renderizarStockFilmesAtlas(termoBusca = '') {
                     <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px; border-top:1px solid #334155; flex-wrap:wrap;">
                         <span><b>${textoSeguroConferencia(item.tipo)}</b><br><small style="color:#94a3b8;">Fornecedor: ${textoSeguroConferencia(item.fornecedor || '-')}</small></span>
                         <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
-                        <button onclick="baixarFilmeStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button>
+                        <div style="display:flex; gap:8px;">
+                            <button onclick="baixarFilmeStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button>
+                            <button onclick="editarFilmeStockAtlas('${item.id}')" style="background:#f59e0b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">EDITAR</button>
+                            <button onclick="excluirFilmeStockAtlas('${item.id}')" style="background:#ef4444; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">EXCLUIR</button>
+                        </div>
                     </div>
                 `).join('')}
             </div>
@@ -6514,9 +6581,15 @@ function cadastrarFilmeStockAtlas() {
     const fornecedor = document.getElementById('stock-film-forn')?.value.trim();
     const qtd = Number(document.getElementById('stock-film-qtd')?.value || 1);
     if (!tipo || !fornecedor) return alert('Informe tipo e fornecedor.');
-    const novo = { id: String(Date.now()), tipo, medida: '', fornecedor, qtd, criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') };
-    registrarHistoricoFilmeStock(novo, 'Filme cadastrado no Stock', novo.criadoPor, novo.criadoEm);
-    atlasStockFilmes.unshift(novo);
+    const existente = atlasStockFilmes.find(f => normalizarStockAtlas(f.tipo) === normalizarStockAtlas(tipo) && normalizarStockAtlas(f.fornecedor) === normalizarStockAtlas(fornecedor));
+    if (existente) {
+        existente.qtd = Number(existente.qtd || 0) + qtd;
+        registrarHistoricoFilmeStock(existente, `Somou ${qtd} un. no cadastro`, atlasUsuarioAtualNome(), new Date().toLocaleString('pt-BR'));
+    } else {
+        const novo = { id: String(Date.now()), tipo, medida: '', fornecedor, qtd, criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') };
+        registrarHistoricoFilmeStock(novo, 'Filme cadastrado no Stock', novo.criadoPor, novo.criadoEm);
+        atlasStockFilmes.unshift(novo);
+    }
     salvarStockAtlas();
     renderizarStockFilmesAtlas();
 }
@@ -6528,6 +6601,33 @@ function baixarFilmeStockAtlas(id) {
     item.ultimaBaixaPor = atlasUsuarioAtualNome();
     item.ultimaBaixaEm = new Date().toLocaleString('pt-BR');
     registrarHistoricoFilmeStock(item, 'Baixa manual no Stock', item.ultimaBaixaPor, item.ultimaBaixaEm);
+    salvarStockAtlas();
+    renderizarStockFilmesAtlas();
+}
+
+function editarFilmeStockAtlas(id) {
+    const item = atlasStockFilmes.find(f => String(f.id) === String(id));
+    if (!item) return;
+    const tipo = prompt('Tipo do filme:', item.tipo || '');
+    if (tipo === null) return;
+    const fornecedor = prompt('Fornecedor:', item.fornecedor || '');
+    if (fornecedor === null) return;
+    const qtd = prompt('Quantidade:', item.qtd || 0);
+    if (qtd === null) return;
+
+    item.tipo = tipo.trim();
+    item.fornecedor = fornecedor.trim();
+    item.qtd = Math.max(0, Number(qtd) || 0);
+    registrarHistoricoFilmeStock(item, 'Filme editado no Stock');
+    salvarStockAtlas();
+    renderizarStockFilmesAtlas();
+}
+
+function excluirFilmeStockAtlas(id) {
+    const item = atlasStockFilmes.find(f => String(f.id) === String(id));
+    if (!item) return;
+    if (!confirm(`Excluir filme ${item.tipo || ''}?`)) return;
+    atlasStockFilmes = atlasStockFilmes.filter(f => String(f.id) !== String(id));
     salvarStockAtlas();
     renderizarStockFilmesAtlas();
 }
