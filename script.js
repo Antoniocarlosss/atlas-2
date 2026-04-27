@@ -4129,6 +4129,15 @@ function salvarModulosVisiveis() {
     alert('Módulos atualizados com sucesso.');
 }
 
+function textoSeguroPermissoes(valor) {
+    return String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function renderizarPermissoesAdmin(idSelecionado = '') {
     if (!usuarioEhAdmin()) return alert('Apenas ADMIN pode acessar permissoes.');
     const render = document.getElementById('render-modulo');
@@ -4144,15 +4153,50 @@ function renderizarPermissoesAdmin(idSelecionado = '') {
     const prefs = obterPreferenciasUsuario(usuarioAlvo.id);
     const modulos = MODULOS_SISTEMA
         .filter((mod, index, self) => self.findIndex(m => m.chave === mod.chave) === index)
-        .filter(mod => mod.chave !== 'permissoes' || usuarioAlvo.cargo === 'admin');
+        .filter(mod => mod.chave !== 'permissoes' || normalizarCargoUsuario(usuarioAlvo.cargo) === 'admin');
 
     render.innerHTML = `
         <div style="padding:15px; color:white;">
             <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px; margin-bottom:15px;">
+                <h3 style="margin:0 0 12px 0; font-size:18px;">Usuarios e senhas</h3>
+                <div style="display:grid; gap:8px;">
+                    ${usuariosSistema.map(u => `
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; align-items:center; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px;">
+                            <div>
+                                <div style="font-weight:bold;">${textoSeguroPermissoes(u.id).toUpperCase()}</div>
+                                <div style="color:#94a3b8; font-size:12px;">Usuario</div>
+                            </div>
+                            <div>
+                                <div style="font-weight:bold;">${textoSeguroPermissoes(normalizarCargoUsuario(u.cargo)).toUpperCase()}</div>
+                                <div style="color:#94a3b8; font-size:12px;">Cargo</div>
+                            </div>
+                            <div>
+                                <div style="font-weight:bold; color:#fbbf24;">${textoSeguroPermissoes(u.senha || '')}</div>
+                                <div style="color:#94a3b8; font-size:12px;">Senha</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px; margin-bottom:15px;">
                 <label style="display:block; color:#94a3b8; font-size:12px; margin-bottom:8px;">USUARIO</label>
                 <select id="perm-usuario" onchange="renderizarPermissoesAdmin(this.value)" style="width:100%; padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
-                    ${usuariosSistema.map(u => `<option value="${u.id}" ${u.id === usuarioAlvo.id ? 'selected' : ''}>${u.id.toUpperCase()} - ${u.cargo.toUpperCase()}</option>`).join('')}
+                    ${usuariosSistema.map(u => `<option value="${textoSeguroPermissoes(u.id)}" ${u.id === usuarioAlvo.id ? 'selected' : ''}>${textoSeguroPermissoes(u.id).toUpperCase()} - ${textoSeguroPermissoes(normalizarCargoUsuario(u.cargo)).toUpperCase()} - Senha: ${textoSeguroPermissoes(u.senha || '')}</option>`).join('')}
                 </select>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:8px; margin-top:10px;">
+                    <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px;">
+                        <div style="color:#94a3b8; font-size:12px;">Usuario selecionado</div>
+                        <strong>${textoSeguroPermissoes(usuarioAlvo.id).toUpperCase()}</strong>
+                    </div>
+                    <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px;">
+                        <div style="color:#94a3b8; font-size:12px;">Cargo</div>
+                        <strong>${textoSeguroPermissoes(normalizarCargoUsuario(usuarioAlvo.cargo)).toUpperCase()}</strong>
+                    </div>
+                    <div style="background:#0f172a; border:1px solid #334155; border-radius:8px; padding:10px;">
+                        <div style="color:#94a3b8; font-size:12px;">Senha</div>
+                        <strong style="color:#fbbf24;">${textoSeguroPermissoes(usuarioAlvo.senha || '')}</strong>
+                    </div>
+                </div>
             </div>
             <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; overflow:hidden;">
                 <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; padding:12px; background:#0f172a; font-weight:bold;">
