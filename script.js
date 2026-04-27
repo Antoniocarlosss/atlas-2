@@ -1043,13 +1043,14 @@ function baixarStockPorLancamentosBobines(itens) {
                 || atlasStockBobinas.find(b => b.status !== 'acabada_mes' && normalizarStockAtlas(b.ral) === ral);
             if (!bobina) return;
 
-            bobina.qtd = Math.max(0, Number(bobina.qtd || 0) - 1);
-            if (item.status === 'SIM' || bobina.qtd === 0) {
+            if (item.status === 'SIM') {
+                bobina.qtd = Math.max(0, Number(bobina.qtd || 0) - 1);
                 bobina.status = 'acabada_mes';
                 bobina.acabadaPor = usuario;
                 bobina.acabadaEm = agora;
                 bobina.acabadaMesISO = new Date().toISOString().slice(0, 7);
             } else {
+                bobina.qtd = Math.max(1, Number(bobina.qtd || 0));
                 bobina.status = 'andamento';
                 bobina.origemAndamento = 'relatorio_bobines';
             }
