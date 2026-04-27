@@ -96,11 +96,24 @@ function aplicarTemaUsuario(tema) {
     document.body.classList.toggle('tema-claro', tema === 'claro');
 }
 
+function garantirCardPermissoesAdmin() {
+    const gridHome = document.getElementById('grid-home');
+    if (!gridHome || document.getElementById('card-permissoes')) return;
+
+    const card = document.createElement('div');
+    card.id = 'card-permissoes';
+    card.className = 'card';
+    card.setAttribute('onclick', "abrirModulo('permissoes')");
+    card.innerHTML = `<i class="fas fa-user-shield"></i><span>PermissÃµes</span>`;
+    gridHome.appendChild(card);
+}
+
 function aplicarPreferenciasVisuaisUsuario() {
     if (!usuarioLogado) return;
 
     const preferencias = obterPreferenciasUsuario(usuarioLogado.id);
     aplicarTemaUsuario(preferencias.tema);
+    garantirCardPermissoesAdmin();
 
     const gridHome = document.getElementById('grid-home');
     if (!gridHome) return;
