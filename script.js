@@ -840,13 +840,14 @@ function setLado(lado) {
     const areaDet = document.getElementById('detalhes-especificos');
     
     if(lancamentoAtual.tipo === 'filme') {
-        let html = (lado === 'inferior') ? `
+        const opcoesComuns = ['Filme 1163', 'Filme 1060', 'Filme 1065'];
+        const opcoesFilme = lado === 'inferior'
+            ? ['5 Ondas - 1265', 'Filme Telha Canudo', ...opcoesComuns]
+            : opcoesComuns;
+        let html = `
             <select id="subtipo_filme" class="input-style">
-                <option value="5 Ondas - 1265">5 Ondas - 1265</option>
-                <option value="Fachada/Chapa superior - 1060">Fachada/Chapa superior - 1060</option>
-                <option value="Fachada/Chapa superior - 1065">Fachada/Chapa superior - 1065</option>
-                <option value="Filme Telha Canudo">Filme Telha Canudo</option>
-            </select>` : `<p style="font-size:13px; color:#94a3b8; margin-bottom:10px;">Tipo: Fachada/Chapa superior - 1060</p>`;
+                ${opcoesFilme.map(v => `<option value="${v}">${v}</option>`).join('')}
+            </select>`;
         
         html += `
             <label style="display:block; margin-bottom:10px; font-size:12px; color:#94a3b8;">QUANTIDADE</label>
@@ -934,7 +935,7 @@ function adicionarAoLancamento() {
     if(!lancamentoAtual.lado) { alert('Selecione a posição!'); return; }
 
     if(lancamentoAtual.tipo === 'filme') {
-        lancamentoAtual.subtipo = (lancamentoAtual.lado === 'superior') ? 'Fachada/Chapa superior - 1060' : document.getElementById('subtipo_filme').value;
+        lancamentoAtual.subtipo = document.getElementById('subtipo_filme')?.value || 'Filme 1060';
     } else {
         lancamentoAtual.numBobine = document.getElementById('num_bobine').value;
         lancamentoAtual.ral = document.getElementById('ral_chapa').value;
@@ -1021,8 +1022,9 @@ function filmeStockCombinaLancamento(itemStock, itemLancamento) {
 
     if (subtipo.includes('telha canudo')) return tipoStock.includes('telha canudo');
     if (subtipo.includes('5 ondas')) return tipoStock.includes('5 ondas') || tipoStock.includes('1265');
-    if (subtipo.includes('1060')) return tipoStock.includes('1060') || tipoStock.includes('fachada') || tipoStock.includes('chapa superior');
-    if (subtipo.includes('1065')) return tipoStock.includes('1065') || tipoStock.includes('fachada') || tipoStock.includes('chapa superior');
+    if (subtipo.includes('1163')) return tipoStock.includes('1163');
+    if (subtipo.includes('1060')) return tipoStock.includes('1060') || tipoStock.includes('fachada/chapa superior - 1060');
+    if (subtipo.includes('1065')) return tipoStock.includes('1065') || tipoStock.includes('fachada/chapa superior - 1065');
     if (subtipo.includes('fachada')) return tipoStock.includes('fachada');
     return tipoStock.includes(subtipo);
 }
@@ -6195,6 +6197,11 @@ function filtrarListaStock(lista, termo) {
     return (lista || []).filter(item => textoFiltroStock(item).includes(busca));
 }
 
+function htmlDatalistStock(id, valores) {
+    const limpos = [...new Set((valores || []).map(v => String(v || '').trim()).filter(Boolean))].slice(0, 120);
+    return `<datalist id="${id}">${limpos.map(v => `<option value="${textoSeguroConferencia(v)}"></option>`).join('')}</datalist>`;
+}
+
 function grupoFornecedorStock(lista) {
     return (lista || []).reduce((acc, item) => {
         const fornecedor = item.fornecedor || 'SEM FORNECEDOR';
@@ -6311,6 +6318,7 @@ function renderizarStockBobinasAtlas(termoBusca = '') {
     const fechadas = listaFiltrada.filter(b => !b.status || b.status === 'fechada');
     const acabadas = listaFiltrada.filter(b => b.status === 'acabada_mes');
     const disponiveisResumo = listaFiltrada.filter(b => b.status !== 'acabada_mes');
+    const sugestoesBobinas = atlasStockBobinas.flatMap(b => [b.numero, b.ral, b.espessura, b.fornecedor, b.medida]);
 
     c.innerHTML = `
         <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
@@ -6330,7 +6338,8 @@ function renderizarStockBobinasAtlas(termoBusca = '') {
 
         ${htmlResumoBobinasStock(disponiveisResumo)}
         <div style="margin-top:14px;">
-            <input id="stock-bob-pesquisa" value="${textoSeguroConferencia(termoBusca)}" oninput="renderizarStockBobinasAtlas(this.value)" placeholder="Pesquisar por bobina, RAL, espessura ou fornecedor" style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+            <input id="stock-bob-pesquisa" list="stock-bob-sugestoes" value="${textoSeguroConferencia(termoBusca)}" oninput="renderizarStockBobinasAtlas(this.value)" placeholder="Pesquisar por bobina, RAL, espessura ou fornecedor" style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+            ${htmlDatalistStock('stock-bob-sugestoes', sugestoesBobinas)}
         </div>
         <details open style="margin-top:18px;">
             <summary style="cursor:pointer; font-size:20px; font-weight:bold;">Em andamento</summary>
@@ -6502,12 +6511,23 @@ function htmlResumoFilmesStock(lista) {
     `;
 }
 
+function normalizarNomeFilmeStock(nome) {
+    const texto = normalizarStockAtlas(nome);
+    if (texto.includes('telha canudo')) return 'Filme Telha Canudo';
+    if (texto.includes('5 ondas') || texto.includes('1265')) return '5 Ondas - 1265';
+    if (texto.includes('1163')) return 'Filme 1163';
+    if (texto.includes('1065')) return 'Filme 1065';
+    if (texto.includes('1060') || texto.includes('fachada') || texto.includes('chapa superior')) return 'Filme 1060';
+    return nome || '';
+}
+
 function migrarFilmesDuplicadosStockAtlas() {
     const mapa = {};
     let alterou = false;
     (atlasStockFilmes || []).forEach(item => {
-        const tipo = item.tipo || 'SEM TIPO';
+        const tipo = normalizarNomeFilmeStock(item.tipo || 'SEM TIPO');
         const fornecedor = item.fornecedor || 'SEM FORNECEDOR';
+        if (tipo !== item.tipo) alterou = true;
         const chave = `${normalizarStockAtlas(tipo)}|||${normalizarStockAtlas(fornecedor)}`;
         if (!mapa[chave]) {
             mapa[chave] = { ...item, tipo, fornecedor, qtd: Number(item.qtd || 0), historico: [...(item.historico || [])] };
@@ -6528,9 +6548,10 @@ function renderizarStockFilmesAtlas(termoBusca = '') {
     migrarFilmesDuplicadosStockAtlas();
     const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
     if (!c) return;
-    const tipos = ['5 Ondas - 1265', 'Fachada/Chapa superior - 1060', 'Fachada/Chapa superior - 1065', 'Filme Telha Canudo'];
+    const tipos = ['5 Ondas - 1265', 'Filme Telha Canudo', 'Filme 1163', 'Filme 1060', 'Filme 1065'];
     const listaFiltrada = filtrarListaStock(atlasStockFilmes, termoBusca);
     const grupos = grupoFornecedorStock(listaFiltrada);
+    const sugestoesFilmes = atlasStockFilmes.flatMap(f => [f.tipo, f.fornecedor]);
 
     c.innerHTML = `
         <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
@@ -6545,7 +6566,8 @@ function renderizarStockFilmesAtlas(termoBusca = '') {
 
         ${htmlResumoFilmesStock(listaFiltrada)}
         <div style="margin-top:14px;">
-            <input id="stock-film-pesquisa" value="${textoSeguroConferencia(termoBusca)}" oninput="renderizarStockFilmesAtlas(this.value)" placeholder="Pesquisar por tipo ou fornecedor" style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+            <input id="stock-film-pesquisa" list="stock-film-sugestoes" value="${textoSeguroConferencia(termoBusca)}" oninput="renderizarStockFilmesAtlas(this.value)" placeholder="Pesquisar por tipo ou fornecedor" style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+            ${htmlDatalistStock('stock-film-sugestoes', sugestoesFilmes)}
         </div>
         <details open style="margin-top:18px;">
             <summary style="cursor:pointer; font-size:20px; font-weight:bold;">Stock de filmes</summary>
@@ -6577,7 +6599,7 @@ function renderizarStockFilmesAtlas(termoBusca = '') {
 }
 
 function cadastrarFilmeStockAtlas() {
-    const tipo = document.getElementById('stock-film-tipo')?.value;
+    const tipo = normalizarNomeFilmeStock(document.getElementById('stock-film-tipo')?.value);
     const fornecedor = document.getElementById('stock-film-forn')?.value.trim();
     const qtd = Number(document.getElementById('stock-film-qtd')?.value || 1);
     if (!tipo || !fornecedor) return alert('Informe tipo e fornecedor.');
@@ -6615,7 +6637,7 @@ function editarFilmeStockAtlas(id) {
     const qtd = prompt('Quantidade:', item.qtd || 0);
     if (qtd === null) return;
 
-    item.tipo = tipo.trim();
+    item.tipo = normalizarNomeFilmeStock(tipo.trim());
     item.fornecedor = fornecedor.trim();
     item.qtd = Math.max(0, Number(qtd) || 0);
     registrarHistoricoFilmeStock(item, 'Filme editado no Stock');
