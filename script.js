@@ -1049,10 +1049,12 @@ function baixarStockPorLancamentosBobines(itens) {
                 bobina.acabadaPor = usuario;
                 bobina.acabadaEm = agora;
                 bobina.acabadaMesISO = new Date().toISOString().slice(0, 7);
+                registrarHistoricoBobinaStock(bobina, `Finalizada no relatorio de Bobines (${item.status})`, usuario, agora);
             } else {
                 bobina.qtd = Math.max(1, Number(bobina.qtd || 0));
                 bobina.status = 'andamento';
                 bobina.origemAndamento = 'relatorio_bobines';
+                registrarHistoricoBobinaStock(bobina, `Usada no relatorio de Bobines e nao finalizada (${item.status})`, usuario, agora);
             }
             bobina.ultimaBaixaPor = usuario;
             bobina.ultimaBaixaEm = agora;
@@ -1067,6 +1069,7 @@ function baixarStockPorLancamentosBobines(itens) {
             filme.qtd = Math.max(0, Number(filme.qtd || 0) - Number(item.qtd || 1));
             filme.ultimaBaixaPor = usuario;
             filme.ultimaBaixaEm = agora;
+            registrarHistoricoFilmeStock(filme, `Baixa pelo relatorio de Bobines: ${Number(item.qtd || 1)} un.`, usuario, agora);
             alterou = true;
         }
     });
@@ -6169,6 +6172,28 @@ function corQtdStock(qtd) {
     return Number(qtd || 0) < 10 ? '#ef4444' : '#10b981';
 }
 
+function registrarHistoricoBobinaStock(item, acao, usuario = atlasUsuarioAtualNome(), dataHora = new Date().toLocaleString('pt-BR')) {
+    if (!item) return;
+    item.historico ||= [];
+    item.historico.unshift({ acao, usuario, dataHora });
+}
+
+function registrarHistoricoFilmeStock(item, acao, usuario = atlasUsuarioAtualNome(), dataHora = new Date().toLocaleString('pt-BR')) {
+    if (!item) return;
+    item.historico ||= [];
+    item.historico.unshift({ acao, usuario, dataHora });
+}
+
+function textoFiltroStock(item) {
+    return normalizarStockAtlas(Object.values(item || {}).filter(v => typeof v !== 'object').join(' '));
+}
+
+function filtrarListaStock(lista, termo) {
+    const busca = normalizarStockAtlas(termo);
+    if (!busca) return lista || [];
+    return (lista || []).filter(item => textoFiltroStock(item).includes(busca));
+}
+
 function grupoFornecedorStock(lista) {
     return (lista || []).reduce((acc, item) => {
         const fornecedor = item.fornecedor || 'SEM FORNECEDOR';
@@ -6230,7 +6255,44 @@ function htmlResumoBobinasStock(lista) {
     `;
 }
 
-function renderizarStockBobinasAtlas() {
+function dataBobinaAcabadaISO(item) {
+    const texto = item.acabadaEm || item.ultimaBaixaEm || item.criadoEm || '';
+    const partes = String(texto).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!partes) return new Date().toISOString().slice(0, 10);
+    return `${partes[3]}-${partes[2]}-${partes[1]}`;
+}
+
+function renderizarAcabadasPorDataStock(lista) {
+    if (!lista.length) return `<div style="color:#94a3b8; padding:12px;">Nenhuma bobina acabada.</div>`;
+    const porAno = {};
+    lista.forEach(item => {
+        const iso = dataBobinaAcabadaISO(item);
+        const [ano, mes, dia] = iso.split('-');
+        porAno[ano] ||= {};
+        porAno[ano][mes] ||= {};
+        porAno[ano][mes][dia] ||= [];
+        porAno[ano][mes][dia].push(item);
+    });
+
+    return Object.keys(porAno).sort().reverse().map(ano => `
+        <details open style="background:#111827; border:1px solid #334155; border-radius:10px; margin-bottom:10px; padding:8px;">
+            <summary style="cursor:pointer; font-weight:bold;">${ano}</summary>
+            ${Object.keys(porAno[ano]).sort().reverse().map(mes => `
+                <details open style="margin:8px 0 0 12px;">
+                    <summary style="cursor:pointer; color:#93c5fd; font-weight:bold;">Mes ${mes}</summary>
+                    ${Object.keys(porAno[ano][mes]).sort().reverse().map(dia => `
+                        <details open style="margin:8px 0 0 12px;">
+                            <summary style="cursor:pointer; color:#fbbf24; font-weight:bold;">Dia ${dia}</summary>
+                            ${renderizarListaBobinasStock(porAno[ano][mes][dia], 'acabada')}
+                        </details>
+                    `).join('')}
+                </details>
+            `).join('')}
+        </details>
+    `).join('');
+}
+
+function renderizarStockBobinasAtlas(termoBusca = '') {
     atlasStockBobinas = JSON.parse(localStorage.getItem('atlas_stock_bobinas')) || [];
     let migrouBobinas = false;
     atlasStockBobinas.forEach(b => {
@@ -6243,10 +6305,11 @@ function renderizarStockBobinasAtlas() {
     const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
     if (!c) return;
 
-    const ativas = atlasStockBobinas.filter(b => b.status === 'andamento' && b.origemAndamento === 'relatorio_bobines');
-    const fechadas = atlasStockBobinas.filter(b => !b.status || b.status === 'fechada');
-    const acabadasMes = atlasStockBobinas.filter(bobinaAcabadaNoMesAtualStock);
-    const disponiveisResumo = atlasStockBobinas.filter(b => b.status !== 'acabada_mes');
+    const listaFiltrada = filtrarListaStock(atlasStockBobinas, termoBusca);
+    const ativas = listaFiltrada.filter(b => b.status === 'andamento' && b.origemAndamento === 'relatorio_bobines');
+    const fechadas = listaFiltrada.filter(b => !b.status || b.status === 'fechada');
+    const acabadas = listaFiltrada.filter(b => b.status === 'acabada_mes');
+    const disponiveisResumo = listaFiltrada.filter(b => b.status !== 'acabada_mes');
 
     c.innerHTML = `
         <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
@@ -6265,13 +6328,29 @@ function renderizarStockBobinasAtlas() {
         </div>
 
         ${htmlResumoBobinasStock(disponiveisResumo)}
-        <h3 style="margin:18px 0 8px;">Em andamento</h3>
-        ${renderizarListaBobinasStock(ativas, 'em andamento')}
-        <h3 style="margin:18px 0 8px;">Fechadas</h3>
-        ${renderizarListaBobinasStock(fechadas, 'fechada')}
-        <h3 style="margin:18px 0 8px;">Acabadas durante o mes</h3>
-        ${renderizarListaBobinasStock(acabadasMes, 'acabada durante o mes')}
+        <div style="margin-top:14px;">
+            <input id="stock-bob-pesquisa" value="${textoSeguroConferencia(termoBusca)}" oninput="renderizarStockBobinasAtlas(this.value)" placeholder="Pesquisar por bobina, RAL, espessura ou fornecedor" style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+        </div>
+        <details open style="margin-top:18px;">
+            <summary style="cursor:pointer; font-size:20px; font-weight:bold;">Em andamento</summary>
+            ${renderizarListaBobinasStock(ativas, 'em andamento')}
+        </details>
+        <details open style="margin-top:18px;">
+            <summary style="cursor:pointer; font-size:20px; font-weight:bold;">Fechadas</summary>
+            ${renderizarListaBobinasStock(fechadas, 'fechada')}
+        </details>
+        <details open style="margin-top:18px;">
+            <summary style="cursor:pointer; font-size:20px; font-weight:bold;">Acabadas</summary>
+            ${renderizarAcabadasPorDataStock(acabadas)}
+        </details>
     `;
+    if (termoBusca) setTimeout(() => {
+        const input = document.getElementById('stock-bob-pesquisa');
+        if (input) {
+            input.focus();
+            input.selectionStart = input.selectionEnd = input.value.length;
+        }
+    }, 0);
 }
 
 function renderizarListaBobinasStock(lista, rotuloVazio) {
@@ -6286,7 +6365,21 @@ function renderizarListaBobinasStock(lista, rotuloVazio) {
             </div>
             ${grupo.itens.map(item => `
                 <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px; border-top:1px solid #334155; flex-wrap:wrap;">
-                    <span><b>Bobina ${textoSeguroConferencia(item.numero)}</b><br><small style="color:#94a3b8;">Medida ${textoSeguroConferencia(item.medida || '-')} | RAL ${textoSeguroConferencia(item.ral)} | Esp. ${textoSeguroConferencia(item.espessura || '-')}</small></span>
+                    <span style="flex:1; min-width:240px;">
+                        <b>Bobina ${textoSeguroConferencia(item.numero)}</b><br>
+                        <small style="color:#94a3b8;">Medida ${textoSeguroConferencia(item.medida || '-')} | RAL ${textoSeguroConferencia(item.ral)} | Esp. ${textoSeguroConferencia(item.espessura || '-')}</small>
+                        <details style="margin-top:6px;">
+                            <summary style="cursor:pointer; color:#93c5fd; font-size:12px;">Historico da bobina</summary>
+                            <div style="margin-top:6px; color:#cbd5e1; font-size:12px;">
+                                ${(item.historico || []).length ? item.historico.map(h => `
+                                    <div style="border-top:1px solid #334155; padding:5px 0;">
+                                        ${textoSeguroConferencia(h.dataHora || '-')} - ${textoSeguroConferencia(h.acao || '-')}<br>
+                                        <span style="color:#94a3b8;">Por: ${textoSeguroConferencia(h.usuario || '-')}</span>
+                                    </div>
+                                `).join('') : '<span style="color:#94a3b8;">Sem historico.</span>'}
+                            </div>
+                        </details>
+                    </span>
                     <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
                     <div style="display:flex; gap:8px;">
                         ${item.status !== 'acabada_mes' ? `<button onclick="baixarBobinaStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button><button onclick="fecharBobinaStockAtlas('${item.id}')" style="background:#64748b; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">ACABOU</button>` : ''}
@@ -6306,7 +6399,9 @@ function cadastrarBobinaStockAtlas() {
     const fornecedor = document.getElementById('stock-bob-forn')?.value.trim();
     const qtd = Number(document.getElementById('stock-bob-qtd')?.value || 1);
     if (!numero || !ral || !medida || !fornecedor) return alert('Informe numero, RAL, medida e fornecedor.');
-    atlasStockBobinas.unshift({ id: String(Date.now()), numero, ral, medida, espessura, fornecedor, qtd, status: 'fechada', criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
+    const nova = { id: String(Date.now()), numero, ral, medida, espessura, fornecedor, qtd, status: 'fechada', criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') };
+    registrarHistoricoBobinaStock(nova, 'Bobina cadastrada no Stock', nova.criadoPor, nova.criadoEm);
+    atlasStockBobinas.unshift(nova);
     salvarStockAtlas();
     renderizarStockBobinasAtlas();
 }
@@ -6319,6 +6414,7 @@ function baixarBobinaStockAtlas(id) {
     item.origemAndamento = '';
     item.ultimaBaixaPor = atlasUsuarioAtualNome();
     item.ultimaBaixaEm = new Date().toLocaleString('pt-BR');
+    registrarHistoricoBobinaStock(item, 'Baixa manual no Stock', item.ultimaBaixaPor, item.ultimaBaixaEm);
     if (item.status === 'acabada_mes') {
         item.acabadaPor = item.ultimaBaixaPor;
         item.acabadaEm = item.ultimaBaixaEm;
@@ -6335,52 +6431,92 @@ function fecharBobinaStockAtlas(id) {
     item.acabadaPor = atlasUsuarioAtualNome();
     item.acabadaEm = new Date().toLocaleString('pt-BR');
     item.acabadaMesISO = new Date().toISOString().slice(0, 7);
+    registrarHistoricoBobinaStock(item, 'Bobina marcada como acabada no Stock', item.acabadaPor, item.acabadaEm);
     salvarStockAtlas();
     renderizarStockBobinasAtlas();
 }
 
-function renderizarStockFilmesAtlas() {
+function contarFilmesStock(lista) {
+    return (lista || []).reduce((acc, item) => {
+        const chave = item.tipo || 'SEM TIPO';
+        acc[chave] = (acc[chave] || 0) + Number(item.qtd || 0);
+        return acc;
+    }, {});
+}
+
+function htmlResumoFilmesStock(lista) {
+    const dados = contarFilmesStock(lista);
+    return `
+        <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px; margin-top:14px;">
+            <h3 style="margin:0 0 12px;">Resumo do stock de filmes</h3>
+            <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;">
+                ${Object.keys(dados).sort().map(tipo => `
+                    <div style="background:#0f172a; border:1px solid #334155; border-radius:10px; padding:12px;">
+                        <b>${textoSeguroConferencia(tipo)}</b>
+                        <div style="font-size:20px; font-weight:bold; color:${corQtdStock(dados[tipo])}; margin-top:8px;">${dados[tipo]} un.</div>
+                    </div>
+                `).join('') || `<small style="color:#94a3b8;">Sem filmes cadastrados.</small>`}
+            </div>
+        </div>
+    `;
+}
+
+function renderizarStockFilmesAtlas(termoBusca = '') {
     atlasStockFilmes = JSON.parse(localStorage.getItem('atlas_stock_filmes')) || [];
     const c = document.getElementById('stock-conteudo') || document.getElementById('render-modulo');
     if (!c) return;
     const tipos = ['5 Ondas - 1265', 'Fachada/Chapa superior - 1060', 'Fachada/Chapa superior - 1065', 'Filme Telha Canudo'];
-    const grupos = grupoFornecedorStock(atlasStockFilmes);
+    const listaFiltrada = filtrarListaStock(atlasStockFilmes, termoBusca);
+    const grupos = grupoFornecedorStock(listaFiltrada);
 
     c.innerHTML = `
         <div style="background:#111827; border:1px solid #334155; border-radius:12px; padding:15px;">
             <h3 style="margin-top:0;">Filmes</h3>
-            <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
+            <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:8px; margin-bottom:12px;">
                 <select id="stock-film-tipo" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${tipos.map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
-                <input id="stock-film-medida" placeholder="Medida" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
                 <select id="stock-film-forn" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">${(OPCOES_FORNECEDORES_STOCK || []).map(v=>`<option value="${v}">${v}</option>`).join('')}</select>
                 <input id="stock-film-qtd" type="number" value="1" min="1" placeholder="Qtd" style="padding:12px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px;">
             </div>
             <button onclick="cadastrarFilmeStockAtlas()" style="width:100%; background:#10b981; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">CADASTRAR FILME</button>
         </div>
 
-        <h3 style="margin:18px 0 8px;">Stock de filmes</h3>
+        ${htmlResumoFilmesStock(listaFiltrada)}
+        <div style="margin-top:14px;">
+            <input id="stock-film-pesquisa" value="${textoSeguroConferencia(termoBusca)}" oninput="renderizarStockFilmesAtlas(this.value)" placeholder="Pesquisar por tipo ou fornecedor" style="width:100%; padding:14px; background:#0f172a; color:white; border:1px solid #334155; border-radius:8px; font-size:16px;">
+        </div>
+        <details open style="margin-top:18px;">
+            <summary style="cursor:pointer; font-size:20px; font-weight:bold;">Stock de filmes</summary>
         ${Object.keys(grupos).length ? Object.keys(grupos).sort().map(forn => `
             <div style="background:#1e293b; border:1px solid #334155; border-radius:10px; margin-bottom:10px; overflow:hidden;">
                 <div style="padding:10px; font-weight:bold; color:white; background:#0f172a;">${textoSeguroConferencia(forn)}</div>
                 ${grupos[forn].map(item => `
                     <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px; border-top:1px solid #334155; flex-wrap:wrap;">
-                        <span><b>${textoSeguroConferencia(item.tipo)}</b><br><small style="color:#94a3b8;">Medida: ${textoSeguroConferencia(item.medida || '-')}</small></span>
+                        <span><b>${textoSeguroConferencia(item.tipo)}</b><br><small style="color:#94a3b8;">Fornecedor: ${textoSeguroConferencia(item.fornecedor || '-')}</small></span>
                         <b style="color:${corQtdStock(item.qtd)};">${Number(item.qtd || 0)} un.</b>
                         <button onclick="baixarFilmeStockAtlas('${item.id}')" style="background:#3b82f6; color:white; border:none; padding:8px 10px; border-radius:6px; font-weight:bold;">BAIXAR</button>
                     </div>
                 `).join('')}
             </div>
         `).join('') : `<div style="color:#94a3b8; padding:12px;">Nenhum filme cadastrado.</div>`}
+        </details>
     `;
+    if (termoBusca) setTimeout(() => {
+        const input = document.getElementById('stock-film-pesquisa');
+        if (input) {
+            input.focus();
+            input.selectionStart = input.selectionEnd = input.value.length;
+        }
+    }, 0);
 }
 
 function cadastrarFilmeStockAtlas() {
     const tipo = document.getElementById('stock-film-tipo')?.value;
-    const medida = document.getElementById('stock-film-medida')?.value.trim();
     const fornecedor = document.getElementById('stock-film-forn')?.value.trim();
     const qtd = Number(document.getElementById('stock-film-qtd')?.value || 1);
     if (!tipo || !fornecedor) return alert('Informe tipo e fornecedor.');
-    atlasStockFilmes.unshift({ id: String(Date.now()), tipo, medida, fornecedor, qtd, criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') });
+    const novo = { id: String(Date.now()), tipo, medida: '', fornecedor, qtd, criadoPor: atlasUsuarioAtualNome(), criadoEm: new Date().toLocaleString('pt-BR') };
+    registrarHistoricoFilmeStock(novo, 'Filme cadastrado no Stock', novo.criadoPor, novo.criadoEm);
+    atlasStockFilmes.unshift(novo);
     salvarStockAtlas();
     renderizarStockFilmesAtlas();
 }
@@ -6391,6 +6527,7 @@ function baixarFilmeStockAtlas(id) {
     item.qtd = Math.max(0, Number(item.qtd || 0) - 1);
     item.ultimaBaixaPor = atlasUsuarioAtualNome();
     item.ultimaBaixaEm = new Date().toLocaleString('pt-BR');
+    registrarHistoricoFilmeStock(item, 'Baixa manual no Stock', item.ultimaBaixaPor, item.ultimaBaixaEm);
     salvarStockAtlas();
     renderizarStockFilmesAtlas();
 }
